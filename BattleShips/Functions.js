@@ -1,0 +1,298 @@
+//---------------------------VAO---------------------------//
+//create VAO
+function setVAO(){
+  _vao = gl.createVertexArray();
+  bindVAO(_vao);
+  return _vao;
+}
+//unbind VAO
+function unbindVAO(){
+  gl.bindVertexArray(null);
+}
+//bind VAO
+function bindVAO(_name){
+  gl.bindVertexArray(_name);
+}
+//---------------------------VAO---------------------------//
+
+//---------------------------Buffers and Attributes---------------------------//
+//Buffer
+function SetBuffer(_data, _type) {
+  var _Buffer = gl.createBuffer();
+  if (_type === "index") {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _Buffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(_data), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+  } else {
+    gl.bindBuffer(gl.ARRAY_BUFFER, _Buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(_data), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  }
+  return _Buffer;
+}
+
+//Attribute
+function SetAttribute(webglHelper, _name, _size, _stride, _offset) {
+
+  var _AttributeLocation = gl.getAttribLocation(webglHelper.program, _name);
+	gl.enableVertexAttribArray(_AttributeLocation);
+	var size = _size;
+	var type = gl.FLOAT;
+	var normalize = false;
+	var stride = _stride * Float32Array.BYTES_PER_ELEMENT;
+	var offset = _offset * Float32Array.BYTES_PER_ELEMENT;
+	gl.vertexAttribPointer(_AttributeLocation, size, type, normalize, stride, offset);
+
+  if (webglHelper.attribLocations[_name] !== undefined)
+        return webglHelper.attribLocations[_name];
+  webglHelper.attribLocations[_name] = _AttributeLocation;
+  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  return _AttributeLocation;
+}
+
+//Buffer and Attribute
+function SetBufferAndAttribute(webglHelper, _name,_data, _size, _stride, _offset) {
+
+  var _Buffer=SetBuffer(_data);
+	gl.bindBuffer(gl.ARRAY_BUFFER, _Buffer);
+	SetAttribute(webglHelper, _name, _size, _stride, _offset);
+}
+
+function SetIndexBuffer(_data) {
+  var _Buffer=SetBuffer(_data,"index");
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _Buffer);
+}
+
+ // Get and cache a uniform location by name
+function getUniformLocation(webglHelper,_name) {
+    if (webglHelper.uniformLocations[_name] !== undefined)
+      return webglHelper.uniformLocations[_name];
+
+    var loc = gl.getUniformLocation(webglHelper.program, _name);
+    webglHelper.uniformLocations[_name] = loc;
+    return loc;
+  }
+
+  // Convenience: set a mat4 uniform
+function setUniformMatrix4fv(webglHelper,_name, mat4Array, transpose = false) {
+    gl.uniformMatrix4fv(getUniformLocation(webglHelper, _name), transpose, mat4Array);
+  }
+
+//---------------------------Buffers and Attributes---------------------------//
+
+//---------------------------Matricies---------------------------//
+
+//View Matrix
+function View(webglHelper, eye, target, up) {
+    let zAxis = normalize(subtract(eye, target));
+    let xAxis = normalize(cross(up, zAxis));
+    let yAxis = cross(zAxis, xAxis);
+
+    let viewMatrix = new Float32Array([
+        xAxis[0], yAxis[0], zAxis[0], 0,
+        xAxis[1], yAxis[1], zAxis[1], 0,
+        xAxis[2], yAxis[2], zAxis[2], 0,
+        -dot(xAxis, eye), -dot(yAxis, eye), -dot(zAxis, eye), 1
+    ]);
+
+    setUniformMatrix4fv(webglHelper, 'uView', viewMatrix);
+}
+// helper functions for View
+function subtract(a,b){ return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+
+function cross(a,b){
+    return [
+        a[1]*b[2]-a[2]*b[1],
+        a[2]*b[0]-a[0]*b[2],
+        a[0]*b[1]-a[1]*b[0]
+    ];
+}
+
+function dot(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+
+function normalize(v){
+    let len = Math.hypot(v[0],v[1],v[2]);
+    return [v[0]/len, v[1]/len, v[2]/len];
+}
+
+//Projection Matrix
+function Projection(webglHelper, fov, aspect, near, far) {
+    let f = 1.0 / Math.tan(fov / 2);
+    let rangeInv = 1 / (near - far);
+
+    let projMatrix = new Float32Array([
+        f/aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (near + far) * rangeInv, -1,
+        0, 0, near * far * rangeInv * 2, 0
+    ]);
+
+    setUniformMatrix4fv(webglHelper, 'uProjection', projMatrix);
+}
+
+//Scale Matrix
+function Scale(webglHelper, Sx, Sy, Sz) {
+	var ScaleMatrix = new Float32Array([
+		Sx, 0.0, 0.0, 0.0,
+		0.0, Sy, 0.0, 0.0,
+		0.0, 0.0, Sz, 0.0,
+		0.0, 0.0, 0.0,1.0
+	]);
+	setUniformMatrix4fv(webglHelper,'uScale', ScaleMatrix);
+
+	return ScaleMatrix;
+}
+
+//Translation
+function Translate(webglHelper, Tx, Ty, Tz) {
+	var TranslationMatrix = new Float32Array([
+		1.0, 0.0, 0.0, 0.0,
+		0.0, 1.0, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		Tx,  Ty,  Tz,  1.0
+	]);
+	
+  setUniformMatrix4fv(webglHelper,'uTranslate', TranslationMatrix);
+
+	return TranslationMatrix;
+}
+
+function RotateY(webglHelper, angle){
+    var c = Math.cos(angle);
+    var s = Math.sin(angle);
+
+    var RotationMatrix = new Float32Array([
+        c, 0.0, -s, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        s, 0.0, c, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    ]);
+    setUniformMatrix4fv(webglHelper,'uRotateY', RotationMatrix);
+    return RotationMatrix;
+}
+
+function RotateX(webglHelper, angle){
+    var c = Math.cos(angle);
+    var s = Math.sin(angle);
+
+    var RotationMatrix = new Float32Array([
+        1.0, 0.0, 0.0, 0.0,
+        0.0, c, s, 0.0,
+        0.0, -s, c, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    ]);
+    setUniformMatrix4fv(webglHelper,'uRotateX', RotationMatrix);
+    return RotationMatrix;
+}
+
+function RotateZ(webglHelper, angle){
+    var c = Math.cos(angle);
+    var s = Math.sin(angle);
+
+    var RotationMatrix = new Float32Array([
+        c, s, 0.0, 0.0,
+        -s, c, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    ]);
+    setUniformMatrix4fv(webglHelper,'uRotateZ', RotationMatrix);
+    return RotationMatrix;
+}
+
+//---------------------------Matricies---------------------------//
+
+// Creates one tile with a black outline
+function createTile(x, y, tileSize, row, col) {
+    const half = tileSize / 2;
+
+    const fillVertices = [
+        x-half, y-half, 0.34,
+        x+half, y-half, 0.34,
+        x+half, y+half, 0.34,
+
+        x-half, y-half, 0.34,
+        x+half, y+half, 0.34,
+        x-half, y+half, 0.34
+    ];
+
+    const fillColors = Array(6).fill().flatMap(() => [0.10, 0.50, 0.90]);
+    const fillIndices = [0,1,2,3,4,5];
+    const fillShape = new Shape(fillVertices, fillColors, fillIndices);
+
+    const outlineVertices = [
+        x-half, y-half, 0.35,
+        x+half, y-half, 0.35,
+        x+half, y+half, 0.35,
+        x-half, y+half, 0.35,
+        x-half, y-half, 0.35
+    ];
+
+    const outlineColors = Array(5).fill().flatMap(() => [0.0, 0.0, 0.0]);
+    const outlineIndices = [0,1,2,3,4];
+    const outlineShape = new Shape(outlineVertices, outlineColors, outlineIndices, gl.LINE_STRIP);
+
+    return {
+        row,
+        col,
+        center: [x, y],
+        size: tileSize,
+        color: [0.10, 0.50, 0.90],
+        fill: fillShape,
+        outline: outlineShape
+    };
+}
+
+// Creates a grid of tiles
+// Bottom row is row 0, left column is col 0
+function createTileGrid(xOffset, yOffset, tileSize, gap, divisions) {
+    const tiles = [];
+    const step = tileSize + gap;
+
+    const totalWidth = divisions * tileSize + (divisions - 1) * gap;
+
+    const startX = -totalWidth / 2 + tileSize / 2 + xOffset;
+    const startY = -totalWidth / 2 + tileSize / 2 + yOffset;
+
+    for (let row = 0; row < divisions; row++) {
+        for (let col = 0; col < divisions; col++) {
+            const x = startX + col * step;
+            const y = startY + row * step;
+            tiles.push(createTile(x, y, tileSize, row, col));
+        }
+    }
+
+    return tiles;
+}
+
+function getHoveredTile(mouseX, mouseY, tiles) {
+    for (let tile of tiles) {
+        const half = tile.size / 2;
+
+        const left = tile.center[0] - half;
+        const right = tile.center[0] + half;
+        const bottom = tile.center[1] - half;
+        const top = tile.center[1] + half;
+
+        if (
+            mouseX >= left &&
+            mouseX <= right &&
+            mouseY >= bottom &&
+            mouseY <= top
+        ) {
+            return tile;
+        }
+    }
+
+    return null;
+}
+
+function screenToWorld(mouseX, mouseY, aspect, fov, eyeZ, planeZ) {
+    const distance = eyeZ - planeZ;
+    const halfHeight = Math.tan(fov / 2) * distance;
+    const halfWidth = halfHeight * aspect;
+
+    return {
+        x: mouseX * halfWidth,
+        y: mouseY * halfHeight
+    };
+}

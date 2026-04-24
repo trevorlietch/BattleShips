@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+    <head>
+        <title>WebGL Class</title>
+    </head>
+    <script src="WebGL.js"></script>
+    <script src="Functions.js"></script>
+    <body>
+        <canvas id="example" tabindex="0" width="1000" height="700" style="border:5px solid black;"></canvas>
+        <script id="vertex-shader" type="x-shader/x-vertex">
+            #version 300 es                 // Use GLSL ES 3.00 (required for WebGL 2)
+            
+            in vec3 coordinates;            // Vertex position attribute (x, y, z)
+            in vec3 color;                  // Vertex color attribute (r, g, b)
+            out vec3 vColor;                // Output color passed to the fragment shader
+            uniform mat4 uTranslate;        // Translation Matrix uniform
+            uniform mat4 uScale;            //Scale Matrix uniform
+            uniform mat4 uRotateY;           // Y Rotation Matrix uniform
+            uniform mat4 uRotateX;           // X Rotation Matrix uniform
+            uniform mat4 uRotateZ;           // Z Rotation Matrix uniform
+            uniform mat4 uView;              // View Matrix uniform
+            uniform mat4 uProjection;
+
+            void main(){                    // Runs once per vertex
+                vColor = color;             // Pass vertex color to fragment shader
+                gl_Position = uProjection * uView * uTranslate * uRotateZ * uRotateY * uRotateX * uScale * vec4(coordinates, 1.0); 
+            }
+        
+            </script>
+            <script id="fragment-shader" type="x-shader/x-fragment">
+                #version 300 es              // Use GLSL ES 3.00 (required for WebGL 2)
+
+                precision mediump float;     // Set default floating-point precision
+                in vec3 vColor;              // Interpolated color from vertex shader
+                out vec4 FragColor;           // Final output color of the fragment
+                
+                void main(){                 // Runs once per fragment (pixel)
+                    FragColor = vec4(vColor, 1.0); // Output RGBA color (opaque)
+                }
+            
+            </script>
+        <script>
+            // Shape class that stores vertex + color data in separate buffers and renders it using WebGL
+            // ONE VAO per shape (mesh). The VAO remembers attribute layout + buffer bindings.
+            class Shape
+            {
+                constructor(vertices, colors, indices, mode = gl.TRIANGLES)
+                {
+                    // Store vertex positions array (x, y, z per vertex)
+                    this.vertices = vertices;
+                    this.indices = indices;
+                    this.mode = mode;
+
+                    // Store vertex colors array (r, g, b per vertex)
+                    this.colors = colors;
+                    this.size = [1.0, 1.0, 1.0]; //scale
+                    this.position=[0.0,0.0,0.0]; //translation
+                    this.rotY = 0.0; //rotation Y axis
+                    this.rotX = 0.0; //rotation X axis
+                    this.rotZ = 0.0; //rotation Z axis
+
+                    // --- Create ONE VAO for this shape ---
+                    this.vao=setVAO();
+
+                    SetBufferAndAttribute(myWebGL, "coordinates",this.vertices, 3, 0, 0);
+                    SetBufferAndAttribute(myWebGL, "color",this.colors, 3, 0, 0);
+                    SetIndexBuffer(this.indices);
+                }
+
+                render()
+                {
+                    Scale(myWebGL, this.size[0], this.size[1], this.size[2]);
+                    Translate(myWebGL, this.position[0], this.position[1], this.position[2]);
+
+                    RotateY(myWebGL, this.rotY);
+                    RotateX(myWebGL, this.rotX);
+                    RotateZ(myWebGL, this.rotZ);
+
+                    // bind THIS shape's VAO first
+                    bindVAO(this.vao);
+
+                    // now update the buffers on the correct VAO
+                    SetBufferAndAttribute(myWebGL, "coordinates", this.vertices, 3, 0, 0);
+                    SetBufferAndAttribute(myWebGL, "color", this.colors, 3, 0, 0);
+                    SetIndexBuffer(this.indices);
+
+                    gl.drawElements(this.mode, this.indices.length, gl.UNSIGNED_SHORT, 0);
+
+                    unbindVAO();
+                }
+            }
+
+        </script>
+        
+        <script>
+            // Get the canvas element from the HTML document
+            var canvas = document.getElementById("example");
+            // Create a WebGL2 rendering context from the canvas
+            var gl= canvas.getContext('webgl2');
+            // Instantiate the WebGL helper class
+            var myWebGL= new WebGL();
+            // event listener for mouse clicks
+            canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+
+    
+            // Rectangles for water
+
+            let waterWidth = 0.6;
+            let sandWidth = 0.2;
+
+            var waterVertices = [
+                -waterWidth, -0.7, 0.0,
+                waterWidth, -0.7, 0.0,
+                waterWidth,  0.7, 0.0,
+
+                -waterWidth, -0.7, 0.0,
+                waterWidth,  0.7, 0.0,
+                -waterWidth,  0.7, 0.0
+            ];
+
+            var waterColors = [
+            0.0, 0.25, 0.55,
+            0.0, 0.25, 0.55,
+            0.0, 0.25, 0.55,
+
+            0.0, 0.25, 0.55,
+            0.0, 0.25, 0.55,
+            0.0, 0.25, 0.55
+        ];
+
+            var waterIndices = [0,1,2, 3,4,5];
+
+            var Water = new Shape(waterVertices, waterColors, waterIndices);
+            
+            // Sand for beach
+            var sandLeftVertices = [
+                -1.0, -0.9, 0.0,
+                -waterWidth, -0.9, 0.0,
+                -waterWidth,  0.9, 0.0,
+
+                -1.0, -0.9, 0.0,
+                -waterWidth,  0.9, 0.0,
+                -1.0,  0.9, 0.0
+            ];
+
+            var sandRightVertices = [
+                waterWidth, -0.9, 0.0,
+                1.0, -0.9, 0.0,
+                1.0,  0.9, 0.0,
+
+                waterWidth, -0.9, 0.0,
+                1.0,  0.9, 0.0,
+                waterWidth,  0.9, 0.0
+            ];
+
+            var sandTopVertices = [
+                -waterWidth, 0.7, 0.0,
+                waterWidth, 0.7, 0.0,
+                waterWidth, 0.7 + sandWidth, 0.0,
+
+                -waterWidth, 0.7, 0.0,
+                waterWidth, 0.7 + sandWidth, 0.0,
+                -waterWidth, 0.7 + sandWidth, 0.0
+            ];
+
+            var sandBottomVertices = [
+                -waterWidth, -0.7, 0.0,
+                waterWidth, -0.7, 0.0,
+                waterWidth, -0.7 - sandWidth, 0.0,
+
+                -waterWidth, -0.7, 0.0,
+                waterWidth, -0.7 - sandWidth, 0.0,
+                -waterWidth, -0.7 - sandWidth, 0.0
+            ];
+
+            var sandColors = [
+                0.9, 0.8, 0.5,
+                0.9, 0.8, 0.5,
+                0.9, 0.8, 0.5,
+
+                0.9, 0.8, 0.5,
+                0.9, 0.8, 0.5,
+                0.9, 0.8, 0.5
+            ];
+
+            // Grass
+            var grassVertices = [
+                -4.0, -2.0, -0.5,
+                4.0, -2.0, -0.5,
+                4.0,  2.0, -0.5,
+
+                -4.0, -2.0, -0.5,
+                4.0,  2.0, -0.5,
+                -4.0,  2.0, -0.5
+            ];
+
+            var grassColors = [
+                0.2, 0.7, 0.2,
+                0.2, 0.7, 0.2,
+                0.2, 0.7, 0.2,
+
+                0.2, 0.7, 0.2,
+                0.2, 0.7, 0.2,
+                0.2, 0.7, 0.2
+            ];
+
+            // Divider Line between grids
+            var dividerVertices = [
+                -0.35, 0, 0.2,
+                0.35, 0, 0.2
+            ];
+
+            var dividerColors = [
+                0,0,0,
+                0,0,0
+            ];
+
+            var dividerIndices = [0,1];
+
+            var divider = new Shape(dividerVertices, dividerColors, dividerIndices, gl.LINES);
+
+            var sandLeft = new Shape(sandLeftVertices, sandColors, waterIndices);
+            var sandRight = new Shape(sandRightVertices, sandColors, waterIndices);
+            var sandTop = new Shape(sandTopVertices, sandColors, waterIndices);
+            var sandBottom = new Shape(sandBottomVertices, sandColors, waterIndices);
+
+
+            var grass = new Shape(grassVertices, grassColors, waterIndices);
+
+            var gridTop = createTileGrid(0.0, 0.30, 0.04, 0.025, 8);
+            var gridBottom = createTileGrid(0.0, -0.30, 0.04, 0.025, 8);
+            
+
+            let mouseX = 0;
+            let mouseY = 0;
+
+            canvas.addEventListener("mousemove", (e) => {
+                let rect = canvas.getBoundingClientRect();
+
+                let x = (e.clientX - rect.left) / rect.width;
+                let y = (e.clientY - rect.top) / rect.height;
+
+                mouseX = (x - 0.5) * 2;
+                mouseY = (0.5 - y) * 2;
+
+            });
+
+
+            function animate(){
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+                let aspect = canvas.width / canvas.height;
+
+                Projection(myWebGL, Math.PI / 3, aspect, 0.1, 100);
+                View(
+                    myWebGL,
+                    [0, 0, 2.0],
+                    [0, 0, 0],
+                    [0, 1, 0]
+                );
+
+                // Render Scene
+                grass.render();
+                sandLeft.render();
+                sandRight.render();
+                sandTop.render();
+                sandBottom.render();
+                Water.render();
+                divider.render();
+
+                gridTop.forEach(tile => {
+                    tile.color = [0.10, 0.50, 0.90];
+                });
+
+                gridBottom.forEach(tile => {
+                    tile.color = [0.10, 0.50, 0.90];
+                });
+
+
+                // Hovered detection
+                const worldMouse = screenToWorld(mouseX, mouseY, aspect, Math.PI / 3, 2.0, 0.34);
+
+                let hoveredTop = getHoveredTile(worldMouse.x, worldMouse.y, gridTop);
+                let hoveredBottom = getHoveredTile(worldMouse.x, worldMouse.y, gridBottom);
+
+                if (hoveredTop) {
+                    hoveredTop.color = [1.0, 1.0, 0.6];
+                } else if (hoveredBottom) {
+                    hoveredBottom.color = [1.0, 1.0, 0.6];
+                }
+
+                // Render tiles
+                gridTop.forEach(tile => {
+                    tile.fill.colors = Array(6).fill().flatMap(() => tile.color);
+                    tile.fill.rotX = 0.0;
+                    tile.outline.rotX = 0.0;
+
+                    tile.fill.render();
+                    tile.outline.render();
+                });
+
+                gridBottom.forEach(tile => {
+                    tile.fill.colors = Array(6).fill().flatMap(() => tile.color);
+                    tile.fill.rotX = 0.0;
+                    tile.outline.rotX = 0.0;
+
+                    tile.fill.render();
+                    tile.outline.render();
+                });
+
+                requestAnimationFrame(animate);
+            }
+            animate();
+
+        </script>
+
+    </body>
+</html> 
