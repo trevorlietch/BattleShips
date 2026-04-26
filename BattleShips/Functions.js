@@ -238,7 +238,8 @@ function createTile(x, y, tileSize, row, col) {
         size: tileSize,
         color: [0.10, 0.50, 0.90],
         fill: fillShape,
-        outline: outlineShape
+        outline: outlineShape,
+        isShip: false
     };
 }
 
@@ -262,6 +263,39 @@ function createTileGrid(xOffset, yOffset, tileSize, gap, divisions) {
     }
 
     return tiles;
+}
+// helps flip
+function moveTileGrid(tiles, dy) {
+    for (let tile of tiles) {
+        tile.center[1] += dy;
+
+        for (let i = 1; i < tile.fill.vertices.length; i += 3) {
+            tile.fill.vertices[i] += dy;
+        }
+
+        for (let i = 1; i < tile.outline.vertices.length; i += 3) {
+            tile.outline.vertices[i] += dy;
+        }
+    }
+}
+function rotateTileGrid180(tiles, centerY) {
+    for (let tile of tiles) {
+        // rotate tile center around board center
+        tile.center[0] = -tile.center[0];
+        tile.center[1] = 2 * centerY - tile.center[1];
+
+        // rotate fill vertices
+        for (let i = 0; i < tile.fill.vertices.length; i += 3) {
+            tile.fill.vertices[i] = -tile.fill.vertices[i];               // x
+            tile.fill.vertices[i + 1] = 2 * centerY - tile.fill.vertices[i + 1]; // y
+        }
+
+        // rotate outline vertices
+        for (let i = 0; i < tile.outline.vertices.length; i += 3) {
+            tile.outline.vertices[i] = -tile.outline.vertices[i];               // x
+            tile.outline.vertices[i + 1] = 2 * centerY - tile.outline.vertices[i + 1]; // y
+        }
+    }
 }
 
 function getHoveredTile(mouseX, mouseY, tiles) {
