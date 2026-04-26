@@ -98,7 +98,7 @@
             var gl= canvas.getContext('webgl2');
             // Instantiate the WebGL helper class
             var myWebGL= new WebGL();
-            // event listener for mouse clicks
+            // Event listener for mouse clicks
             canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 
@@ -229,7 +229,14 @@
 
             var gridTop = createTileGrid(0.0, 0.30, 0.04, 0.025, 8);
             var gridBottom = createTileGrid(0.0, -0.30, 0.04, 0.025, 8);
-            
+
+            // Game state variables
+            let currentSetupPlayer = "bottom"; // "top" or "bottom"
+            let bottomShipsPlaced = 0;
+            let topShipsPlaced = 0;
+            let setupDone = false;
+
+            let hoveredTile = null;
 
             let mouseX = 0;
             let mouseY = 0;
@@ -245,6 +252,52 @@
 
             });
 
+            canvas.addEventListener("click", () => {
+                if (setupDone || !hoveredTile) return;
+
+                // Can only place 5 ships
+                if (currentSetupPlayer === "bottom") {
+                    if (!hoveredTile.isShip && bottomShipsPlaced >= 5) return;
+
+                    // toggle ship placement
+                    if (hoveredTile.isShip) {
+                        hoveredTile.isShip = false;
+                        bottomShipsPlaced--;
+                    } else {
+                        hoveredTile.isShip = true;
+                        bottomShipsPlaced++;
+                    }
+
+                    // once bottom finishes, switch to top
+                    if (bottomShipsPlaced === 5) {
+                        // swap board positions
+                        moveTileGrid(gridBottom, 0.60);
+                        moveTileGrid(gridTop, -0.60);
+
+                        // rotate both boards 180 degrees around their new centers
+                        rotateTileGrid180(gridBottom, 0.30);
+                        rotateTileGrid180(gridTop, -0.30);
+
+                        currentSetupPlayer = "top";
+                    }
+                }
+
+                else if (currentSetupPlayer === "top") {
+                    if (!hoveredTile.isShip && topShipsPlaced >= 5) return;
+
+                    if (hoveredTile.isShip) {
+                        hoveredTile.isShip = false;
+                        topShipsPlaced--;
+                    } else {
+                        hoveredTile.isShip = true;
+                        topShipsPlaced++;
+                    }
+
+                    if (topShipsPlaced === 5) {
+                        setupDone = true;
+                    }
+                }
+            });
 
             function animate(){
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -252,12 +305,9 @@
                 let aspect = canvas.width / canvas.height;
 
                 Projection(myWebGL, Math.PI / 3, aspect, 0.1, 100);
-                View(
-                    myWebGL,
-                    [0, 0, 2.0],
-                    [0, 0, 0],
-                    [0, 1, 0]
-                );
+                
+                View(myWebGL, [0, 0, 2.0], [0, 0, 0], [0, 1, 0]);
+                
 
                 // Render Scene
                 grass.render();
@@ -269,24 +319,39 @@
                 divider.render();
 
                 gridTop.forEach(tile => {
-                    tile.color = [0.10, 0.50, 0.90];
+                    if (tile.isShip) {
+                        tile.color = [1.0, 0.0, 0.0];   // red
+                    } else {
+                        tile.color = [0.10, 0.50, 0.90]; // blue
+                    }
                 });
 
                 gridBottom.forEach(tile => {
-                    tile.color = [0.10, 0.50, 0.90];
+                    if (tile.isShip) {
+                        tile.color = [1.0, 0.0, 0.0];
+                    } else {
+                        tile.color = [0.10, 0.50, 0.90];
+                    }
                 });
-
 
                 // Hovered detection
                 const worldMouse = screenToWorld(mouseX, mouseY, aspect, Math.PI / 3, 2.0, 0.34);
 
-                let hoveredTop = getHoveredTile(worldMouse.x, worldMouse.y, gridTop);
-                let hoveredBottom = getHoveredTile(worldMouse.x, worldMouse.y, gridBottom);
+                let hoverX = worldMouse.x;
+                let hoverY = worldMouse.y;
 
-                if (hoveredTop) {
-                    hoveredTop.color = [1.0, 1.0, 0.6];
-                } else if (hoveredBottom) {
-                    hoveredBottom.color = [1.0, 1.0, 0.6];
+                hoveredTile = null;
+
+                if (!setupDone) {
+                    if (currentSetupPlayer === "bottom") {
+                        hoveredTile = getHoveredTile(hoverX, hoverY, gridBottom);
+                    } else if (currentSetupPlayer === "top") {
+                        hoveredTile = getHoveredTile(hoverX, hoverY, gridTop);
+                    }
+                }
+
+                if (hoveredTile && !hoveredTile.isShip) {
+                    hoveredTile.color = [1.0, 1.0, 0.6]; // yellow hover
                 }
 
                 // Render tiles
