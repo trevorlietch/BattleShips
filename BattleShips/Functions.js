@@ -80,6 +80,55 @@ function setUniformMatrix4fv(webglHelper,_name, mat4Array, transpose = false) {
 
 //---------------------------Buffers and Attributes---------------------------//
 
+// Math Helpers
+function add(a, b) {
+    return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function subtractVectors(a, b) {
+    return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function scale(v, s) {
+    return [v[0] * s, v[1] * s, v[2] * s];
+}
+
+// Help the mouse line up to the board for tile selection
+function rayFromMouse(mouseX, mouseY, aspect, fov, eye, target, up) {
+    let forward = normalize(subtract(target, eye));
+    let right = normalize(cross(forward, up));
+    let trueUp = normalize(cross(right, forward));
+
+    let tanFov = Math.tan(fov / 2);
+
+    let px = mouseX * aspect * tanFov;
+    let py = mouseY * tanFov;
+
+    let dir = normalize([
+        forward[0] + right[0] * px + trueUp[0] * py,
+        forward[1] + right[1] * px + trueUp[1] * py,
+        forward[2] + right[2] * px + trueUp[2] * py
+    ]);
+
+    return {
+        origin: eye,
+        direction: dir
+    };
+}
+
+function intersectRayWithZPlane(rayOrigin, rayDir, planeZ) {
+    if (Math.abs(rayDir[2]) < 0.000001) return null;
+
+    let t = (planeZ - rayOrigin[2]) / rayDir[2];
+    if (t < 0) return null;
+
+    return [
+        rayOrigin[0] + rayDir[0] * t,
+        rayOrigin[1] + rayDir[1] * t,
+        planeZ
+    ];
+}
+
 //---------------------------Matricies---------------------------//
 
 //View Matrix
@@ -206,13 +255,13 @@ function createTile(x, y, tileSize, row, col) {
     const half = tileSize / 2;
 
     const fillVertices = [
-        x-half, y-half, 0.34,
-        x+half, y-half, 0.34,
-        x+half, y+half, 0.34,
+        x-half, y-half, -0.10,
+        x+half, y-half, -0.10,
+        x+half, y+half, -0.10,
 
-        x-half, y-half, 0.34,
-        x+half, y+half, 0.34,
-        x-half, y+half, 0.34
+        x-half, y-half, -0.10,
+        x+half, y+half, -0.10,
+        x-half, y+half, -0.10
     ];
 
     const fillColors = Array(6).fill().flatMap(() => [0.10, 0.50, 0.90]);
@@ -220,11 +269,11 @@ function createTile(x, y, tileSize, row, col) {
     const fillShape = new Shape(fillVertices, fillColors, fillIndices);
 
     const outlineVertices = [
-        x-half, y-half, 0.35,
-        x+half, y-half, 0.35,
-        x+half, y+half, 0.35,
-        x-half, y+half, 0.35,
-        x-half, y-half, 0.35
+        x-half, y-half, -0.09,
+        x+half, y-half, -0.09,
+        x+half, y+half, -0.09,
+        x-half, y+half, -0.09,
+        x-half, y-half, -0.09
     ];
 
     const outlineColors = Array(5).fill().flatMap(() => [0.0, 0.0, 0.0]);

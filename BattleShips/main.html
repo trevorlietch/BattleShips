@@ -41,33 +41,48 @@
         <script>
             // Shape class that stores vertex + color data in separate buffers and renders it using WebGL
             // ONE VAO per shape (mesh). The VAO remembers attribute layout + buffer bindings.
-            class Shape
-            {
-                constructor(vertices, colors, indices, mode = gl.TRIANGLES)
-                {
-                    // Store vertex positions array (x, y, z per vertex)
+            class Shape {
+                constructor(vertices, colors, indices, mode = gl.TRIANGLES) {
                     this.vertices = vertices;
                     this.indices = indices;
                     this.mode = mode;
 
-                    // Store vertex colors array (r, g, b per vertex)
                     this.colors = colors;
-                    this.size = [1.0, 1.0, 1.0]; //scale
-                    this.position=[0.0,0.0,0.0]; //translation
-                    this.rotY = 0.0; //rotation Y axis
-                    this.rotX = 0.0; //rotation X axis
-                    this.rotZ = 0.0; //rotation Z axis
+                    this.size = [1.0, 1.0, 1.0];
+                    this.position = [0.0, 0.0, 0.0];
+                    this.rotY = 0.0;
+                    this.rotX = 0.0;
+                    this.rotZ = 0.0;
 
-                    // --- Create ONE VAO for this shape ---
-                    this.vao=setVAO();
+                    this.vao = setVAO();
 
-                    SetBufferAndAttribute(myWebGL, "coordinates",this.vertices, 3, 0, 0);
-                    SetBufferAndAttribute(myWebGL, "color",this.colors, 3, 0, 0);
-                    SetIndexBuffer(this.indices);
+                    bindVAO(this.vao);
+
+                    // create buffers once
+                    this.vertexBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
+
+                    let coordLoc = gl.getAttribLocation(myWebGL.program, "coordinates");
+                    gl.enableVertexAttribArray(coordLoc);
+                    gl.vertexAttribPointer(coordLoc, 3, gl.FLOAT, false, 0, 0);
+
+                    this.colorBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.colors), gl.DYNAMIC_DRAW);
+
+                    let colorLoc = gl.getAttribLocation(myWebGL.program, "color");
+                    gl.enableVertexAttribArray(colorLoc);
+                    gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
+
+                    this.indexBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+                    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indices), gl.STATIC_DRAW);
+
+                    unbindVAO();
                 }
 
-                render()
-                {
+                render() {
                     Scale(myWebGL, this.size[0], this.size[1], this.size[2]);
                     Translate(myWebGL, this.position[0], this.position[1], this.position[2]);
 
@@ -75,13 +90,11 @@
                     RotateX(myWebGL, this.rotX);
                     RotateZ(myWebGL, this.rotZ);
 
-                    // bind THIS shape's VAO first
                     bindVAO(this.vao);
 
-                    // now update the buffers on the correct VAO
-                    SetBufferAndAttribute(myWebGL, "coordinates", this.vertices, 3, 0, 0);
-                    SetBufferAndAttribute(myWebGL, "color", this.colors, 3, 0, 0);
-                    SetIndexBuffer(this.indices);
+                    // only update color buffer when rendering
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.colors), gl.DYNAMIC_DRAW);
 
                     gl.drawElements(this.mode, this.indices.length, gl.UNSIGNED_SHORT, 0);
 
@@ -102,20 +115,51 @@
             canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 
+            // Camera 
+            let moveSpeed = 0.02;
+            let cameraUp = [0, -1, 0];
+
+            const cameraA = {
+                position: [0, 2.2, 1.7],
+                target: [0, 0.1, -0.15]
+            };
+
+            const cameraB = {
+                position: [0, -2.2, 1.7],
+                target: [0, 0.1, -0.15]
+            };
+
+            let cameraPos = [...cameraA.position];
+            let cameraTarget = [...cameraA.target];
+
+            let keyW = false;
+            let keyA = false;
+            let keyS = false;
+            let keyD = false;
+            let keySpace = false;
+            let keyShift = false;
+
+            // Scene dimensions
+            const outerX = 1.0;
+            const outerY = 0.9;
+            const innerX = 0.6;
+            const innerY = 0.7;
+
+            const grassZ = 0.20;
+            const waterZ = -0.15;
     
             // Rectangles for water
-
             let waterWidth = 0.6;
             let sandWidth = 0.2;
 
             var waterVertices = [
-                -waterWidth, -0.7, 0.0,
-                waterWidth, -0.7, 0.0,
-                waterWidth,  0.7, 0.0,
+                -waterWidth, -0.7, waterZ,
+                waterWidth, -0.7, waterZ,
+                waterWidth,  0.7, waterZ,
 
-                -waterWidth, -0.7, 0.0,
-                waterWidth,  0.7, 0.0,
-                -waterWidth,  0.7, 0.0
+                -waterWidth, -0.7, waterZ,
+                waterWidth,  0.7, waterZ,
+                -waterWidth,  0.7, waterZ
             ];
 
             var waterColors = [
@@ -134,43 +178,43 @@
             
             // Sand for beach
             var sandLeftVertices = [
-                -1.0, -0.9, 0.0,
-                -waterWidth, -0.9, 0.0,
-                -waterWidth,  0.9, 0.0,
+                -outerX, -outerY, grassZ,
+                -innerX, -innerY, waterZ,
+                -innerX,  innerY, waterZ,
 
-                -1.0, -0.9, 0.0,
-                -waterWidth,  0.9, 0.0,
-                -1.0,  0.9, 0.0
+                -outerX, -outerY, grassZ,
+                -innerX,  innerY, waterZ,
+                -outerX,  outerY, grassZ
             ];
 
             var sandRightVertices = [
-                waterWidth, -0.9, 0.0,
-                1.0, -0.9, 0.0,
-                1.0,  0.9, 0.0,
+                innerX, -innerY, waterZ,
+                outerX, -outerY, grassZ,
+                outerX,  outerY, grassZ,
 
-                waterWidth, -0.9, 0.0,
-                1.0,  0.9, 0.0,
-                waterWidth,  0.9, 0.0
+                innerX, -innerY, waterZ,
+                outerX,  outerY, grassZ,
+                innerX,  innerY, waterZ
             ];
 
             var sandTopVertices = [
-                -waterWidth, 0.7, 0.0,
-                waterWidth, 0.7, 0.0,
-                waterWidth, 0.7 + sandWidth, 0.0,
+                -outerX, outerY, grassZ,
+                outerX, outerY, grassZ,
+                innerX, innerY, waterZ,
 
-                -waterWidth, 0.7, 0.0,
-                waterWidth, 0.7 + sandWidth, 0.0,
-                -waterWidth, 0.7 + sandWidth, 0.0
+                -outerX, outerY, grassZ,
+                innerX, innerY, waterZ,
+                -innerX, innerY, waterZ
             ];
 
             var sandBottomVertices = [
-                -waterWidth, -0.7, 0.0,
-                waterWidth, -0.7, 0.0,
-                waterWidth, -0.7 - sandWidth, 0.0,
+                -innerX, -innerY, waterZ,
+                innerX, -innerY, waterZ,
+                outerX, -outerY, grassZ,
 
-                -waterWidth, -0.7, 0.0,
-                waterWidth, -0.7 - sandWidth, 0.0,
-                -waterWidth, -0.7 - sandWidth, 0.0
+                -innerX, -innerY, waterZ,
+                outerX, -outerY, grassZ,
+                -outerX, -outerY, grassZ
             ];
 
             var sandColors = [
@@ -184,14 +228,44 @@
             ];
 
             // Grass
-            var grassVertices = [
-                -4.0, -2.0, -0.5,
-                4.0, -2.0, -0.5,
-                4.0,  2.0, -0.5,
+            var grassLeftVertices = [
+                -4.0, -2.0, grassZ,
+                -outerX, -2.0, grassZ,
+                -outerX,  2.0, grassZ,
 
-                -4.0, -2.0, -0.5,
-                4.0,  2.0, -0.5,
-                -4.0,  2.0, -0.5
+                -4.0, -2.0, grassZ,
+                -outerX,  2.0, grassZ,
+                -4.0,  2.0, grassZ
+            ];
+
+            var grassRightVertices = [
+                outerX, -2.0, grassZ,
+                4.0,    -2.0, grassZ,
+                4.0,     2.0, grassZ,
+
+                outerX, -2.0, grassZ,
+                4.0,     2.0, grassZ,
+                outerX,  2.0, grassZ
+            ];
+
+            var grassTopVertices = [
+                -outerX, outerY, grassZ,
+                outerX, outerY, grassZ,
+                outerX, 2.0,    grassZ,
+
+                -outerX, outerY, grassZ,
+                outerX, 2.0,    grassZ,
+                -outerX, 2.0,    grassZ
+            ];
+
+            var grassBottomVertices = [
+                -outerX, -2.0, grassZ,
+                outerX, -2.0, grassZ,
+                outerX, -outerY, grassZ,
+
+                -outerX, -2.0, grassZ,
+                outerX, -outerY, grassZ,
+                -outerX, -outerY, grassZ
             ];
 
             var grassColors = [
@@ -206,8 +280,8 @@
 
             // Divider Line between grids
             var dividerVertices = [
-                -0.35, 0, 0.2,
-                0.35, 0, 0.2
+                -0.35, 0, -0.08,
+                0.35, 0, -0.08
             ];
 
             var dividerColors = [
@@ -224,14 +298,17 @@
             var sandTop = new Shape(sandTopVertices, sandColors, waterIndices);
             var sandBottom = new Shape(sandBottomVertices, sandColors, waterIndices);
 
+            var grassLeft = new Shape(grassLeftVertices, grassColors, waterIndices);
+            var grassRight = new Shape(grassRightVertices, grassColors, waterIndices);
+            var grassTop = new Shape(grassTopVertices, grassColors, waterIndices);
+            var grassBottom = new Shape(grassBottomVertices, grassColors, waterIndices);
 
-            var grass = new Shape(grassVertices, grassColors, waterIndices);
-
-            var gridTop = createTileGrid(0.0, 0.30, 0.04, 0.025, 8);
-            var gridBottom = createTileGrid(0.0, -0.30, 0.04, 0.025, 8);
+            var gridTop = createTileGrid(0.0, 0.30, 0.05, 0.0, 8);
+            var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 8);
 
             // Game state variables
             let currentSetupPlayer = "bottom"; // "top" or "bottom"
+            let isPlayerBView = false;
             let bottomShipsPlaced = 0;
             let topShipsPlaced = 0;
             let setupDone = false;
@@ -263,22 +340,20 @@
                     if (hoveredTile.isShip) {
                         hoveredTile.isShip = false;
                         bottomShipsPlaced--;
-                    } else {
+                    } 
+                    else {
                         hoveredTile.isShip = true;
                         bottomShipsPlaced++;
                     }
 
                     // once bottom finishes, switch to top
                     if (bottomShipsPlaced === 5) {
-                        // swap board positions
-                        moveTileGrid(gridBottom, 0.60);
-                        moveTileGrid(gridTop, -0.60);
-
-                        // rotate both boards 180 degrees around their new centers
-                        rotateTileGrid180(gridBottom, 0.30);
-                        rotateTileGrid180(gridTop, -0.30);
+                        cameraPos = [...cameraB.position];
+                        cameraTarget = [...cameraB.target];
+                        cameraUp = [0, 1, 0];
 
                         currentSetupPlayer = "top";
+                        isPlayerBView = true;
                     }
                 }
 
@@ -288,7 +363,8 @@
                     if (hoveredTile.isShip) {
                         hoveredTile.isShip = false;
                         topShipsPlaced--;
-                    } else {
+                    } 
+                    else {
                         hoveredTile.isShip = true;
                         topShipsPlaced++;
                     }
@@ -299,29 +375,160 @@
                 }
             });
 
+            // key listeners
+            window.addEventListener("keydown", (e) => {
+                switch (e.key.toLowerCase()) {
+                    case "w": keyW = true; break;
+                    case "a": keyA = true; break;
+                    case "s": keyS = true; break;
+                    case "d": keyD = true; break;
+                    case " ": keySpace = true; break;
+                }
+
+                if (e.key === "Shift") {
+                    keyShift = true;
+                }
+            });
+
+            window.addEventListener("keyup", (e) => {
+                switch (e.key.toLowerCase()) {
+                    case "w": keyW = false; break;
+                    case "a": keyA = false; break;
+                    case "s": keyS = false; break;
+                    case "d": keyD = false; break;
+                    case " ": keySpace = false; break;
+                }
+
+                if (e.key === "Shift") {
+                    keyShift = false;
+                }
+            });
+
+            function updateCamera() {
+                // forward direction toward where camera is looking,
+                // but flattened onto the water plane
+                let forward = [
+                    cameraTarget[0] - cameraPos[0],
+                    0,
+                    cameraTarget[2] - cameraPos[2]
+                ];
+
+                let len = Math.hypot(forward[0], forward[2]);
+                if (len < 0.0001) {
+                    forward = [0, 0, -1];
+                } 
+                else {
+                    forward = [forward[0] / len, 0, forward[2] / len];
+                }
+
+                // right vector on the water plane
+                let right = [forward[2], 0, -forward[0]];
+
+                // keep same viewing tilt
+                let lookOffset = [
+                    cameraTarget[0] - cameraPos[0],
+                    cameraTarget[1] - cameraPos[1],
+                    cameraTarget[2] - cameraPos[2]
+                ];
+
+                if (keyShift) {
+                    cameraPos[0] += forward[0] * moveSpeed;
+                    cameraPos[2] += forward[2] * moveSpeed;
+                }
+                if (keySpace) {
+                    cameraPos[0] -= forward[0] * moveSpeed;
+                    cameraPos[2] -= forward[2] * moveSpeed;
+                }
+                if (!isPlayerBView) {
+                    if (keyA) {
+                        cameraPos[0] -= right[0] * moveSpeed;
+                        cameraPos[2] -= right[2] * moveSpeed;
+                    }
+                    if (keyD) {
+                        cameraPos[0] += right[0] * moveSpeed;
+                        cameraPos[2] += right[2] * moveSpeed;
+                    }
+                } else {
+                    if (keyA) {
+                        cameraPos[0] += right[0] * moveSpeed;
+                        cameraPos[2] += right[2] * moveSpeed;
+                    }
+                    if (keyD) {
+                        cameraPos[0] -= right[0] * moveSpeed;
+                        cameraPos[2] -= right[2] * moveSpeed;
+                    }
+                }
+
+                // vertical only
+                if (!isPlayerBView) {
+                    if (keyW) {
+                        cameraPos[1] -= moveSpeed;
+                    }
+                    if (keyS) {
+                        cameraPos[1] += moveSpeed;
+                    }
+                } else {
+                    if (keyW) {
+                        cameraPos[1] += moveSpeed;
+                    }
+                    if (keyS) {
+                        cameraPos[1] -= moveSpeed;
+                    }
+                }
+
+                // restore the same camera tilt/look
+                cameraTarget = [
+                    cameraPos[0] + lookOffset[0],
+                    cameraPos[1] + lookOffset[1],
+                    cameraPos[2] + lookOffset[2]
+                ];
+            }
+
             function animate(){
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
                 let aspect = canvas.width / canvas.height;
 
+                updateCamera();
+
                 Projection(myWebGL, Math.PI / 3, aspect, 0.1, 100);
                 
-                View(myWebGL, [0, 0, 2.0], [0, 0, 0], [0, 1, 0]);
-                
+                View(myWebGL, cameraPos, cameraTarget, cameraUp);
+
+                const flipY = -1;
+
+                grassLeft.size[1] = flipY;
+                grassRight.size[1] = flipY;
+                grassTop.size[1] = flipY;
+                grassBottom.size[1] = flipY;
+
+                sandLeft.size[1] = flipY;
+                sandRight.size[1] = flipY;
+                sandTop.size[1] = flipY;
+                sandBottom.size[1] = flipY;
+
+                Water.size[1] = flipY;
+                divider.size[1] = flipY;
 
                 // Render Scene
-                grass.render();
+                grassLeft.render();
+                grassRight.render();
+                grassTop.render();
+                grassBottom.render();
+
                 sandLeft.render();
                 sandRight.render();
                 sandTop.render();
                 sandBottom.render();
+
                 Water.render();
                 divider.render();
 
                 gridTop.forEach(tile => {
                     if (tile.isShip) {
                         tile.color = [1.0, 0.0, 0.0];   // red
-                    } else {
+                    } 
+                    else {
                         tile.color = [0.10, 0.50, 0.90]; // blue
                     }
                 });
@@ -329,36 +536,42 @@
                 gridBottom.forEach(tile => {
                     if (tile.isShip) {
                         tile.color = [1.0, 0.0, 0.0];
-                    } else {
+                    } 
+                    else {
                         tile.color = [0.10, 0.50, 0.90];
                     }
                 });
 
                 // Hovered detection
-                const worldMouse = screenToWorld(mouseX, mouseY, aspect, Math.PI / 3, 2.0, 0.34);
-
-                let hoverX = worldMouse.x;
-                let hoverY = worldMouse.y;
+                const ray = rayFromMouse(mouseX, mouseY, aspect, Math.PI / 3, cameraPos, cameraTarget, cameraUp);
+                const hitPoint = intersectRayWithZPlane(ray.origin, ray.direction, -0.10);
 
                 hoveredTile = null;
 
-                if (!setupDone) {
+                if (hitPoint && !setupDone) {
+                    let hoverX = hitPoint[0];
+                    let hoverY = hitPoint[1];
+
+                    // because you flip everything with size[1] = -1
+                    hoverY = -hoverY;
+
                     if (currentSetupPlayer === "bottom") {
                         hoveredTile = getHoveredTile(hoverX, hoverY, gridBottom);
-                    } else if (currentSetupPlayer === "top") {
+                    } 
+                    else if (currentSetupPlayer === "top") {
                         hoveredTile = getHoveredTile(hoverX, hoverY, gridTop);
                     }
                 }
 
                 if (hoveredTile && !hoveredTile.isShip) {
-                    hoveredTile.color = [1.0, 1.0, 0.6]; // yellow hover
+                    hoveredTile.color = [1.0, 1.0, 0.6];
                 }
 
                 // Render tiles
                 gridTop.forEach(tile => {
                     tile.fill.colors = Array(6).fill().flatMap(() => tile.color);
-                    tile.fill.rotX = 0.0;
-                    tile.outline.rotX = 0.0;
+                    tile.fill.size[1] = flipY;
+                    tile.outline.size[1] = flipY;
 
                     tile.fill.render();
                     tile.outline.render();
@@ -366,8 +579,8 @@
 
                 gridBottom.forEach(tile => {
                     tile.fill.colors = Array(6).fill().flatMap(() => tile.color);
-                    tile.fill.rotX = 0.0;
-                    tile.outline.rotX = 0.0;
+                    tile.fill.size[1] = flipY;
+                    tile.outline.size[1] = flipY;
 
                     tile.fill.render();
                     tile.outline.render();
