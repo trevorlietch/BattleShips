@@ -324,3 +324,50 @@ function getHoveredTile(mouseX, mouseY, tiles) {
 
     return null;
 }
+
+// Helper to find a tile by its row and column
+function getTileAtRowCol(tiles, row, col) {
+    return tiles.find(tile => tile.row === row && tile.col === col) || null;
+}
+
+// Gets the cells that a ship would occupy based on its starting tile, length, and orientation
+function getPlacementCells(startTile, shipLength, horizontal, tiles) {
+    const cells = [];
+
+    for (let i = 0; i < shipLength; i++) {
+        const row = horizontal ? startTile.row : startTile.row + i;
+        const col = horizontal ? startTile.col + i : startTile.col;
+
+        const tile = getTileAtRowCol(tiles, row, col);
+        if (!tile) return null;
+
+        cells.push(tile);
+    }
+
+    return cells;
+}
+
+// Makes sure the cells a ship would occupy are not already occupied by another placed ship
+function cellsOverlapPlacedShip(cells, fleet) {
+    for (let ship of fleet) {
+        if (!ship.placed) continue;
+
+        for (let cell of cells) {
+            for (let placedCell of ship.cells) {
+                if (cell.row === placedCell.row && cell.col === placedCell.col) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+// Checks if a point is inside a rectangle (used for picking ships on the side)
+function pointInRect(x, y, cx, cy, w, h) {
+    return (
+        x >= cx - w / 2 &&
+        x <= cx + w / 2 &&
+        y >= cy - h / 2 &&
+        y <= cy + h / 2
+    );
+}
