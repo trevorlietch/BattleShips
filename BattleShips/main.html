@@ -5,6 +5,9 @@
     <script src="WebGL.js"></script>
     <script src="Functions.js"></script>
     <body>
+        <button id="rotateShipBtn">Rotate Ship</button>
+        <button id="confirmTurnBtn">Confirm Turn</button>
+        <br>
         <canvas id="example" tabindex="0" width="1000" height="700" style="border:5px solid black;"></canvas>
         <script id="vertex-shader" type="x-shader/x-vertex">
             #version 300 es                 // Use GLSL ES 3.00 (required for WebGL 2)
@@ -104,7 +107,7 @@
 
         </script>
         
-        <script>
+        <script>            
             // Get the canvas element from the HTML document
             var canvas = document.getElementById("example");
             // Create a WebGL2 rendering context from the canvas
@@ -125,7 +128,7 @@
             };
 
             const cameraB = {
-                position: [0, -2.2, 1.7],
+                position: [0, -2.2, 1.7], // [0, -2.2, 1.7]
                 target: [0, 0.1, -0.15]
             };
 
@@ -309,14 +312,24 @@
             // Game state variables
             let currentSetupPlayer = "bottom"; // "top" or "bottom"
             let isPlayerBView = false;
-            let bottomShipsPlaced = 0;
-            let topShipsPlaced = 0;
+            //Ship Placements
+            const SHIP_LENGTHS = [5, 4, 3, 3, 2];
+
+            let playerAFleet = [];
+            let playerBFleet = [];
+
+            let availableShips = [];
+            let selectedShip = null;
+            let previewCells = [];
+
             let setupDone = false;
 
             let hoveredTile = null;
 
             let mouseX = 0;
             let mouseY = 0;
+
+            availableShips = makeFleetForCurrentPlayer();
 
             canvas.addEventListener("mousemove", (e) => {
                 let rect = canvas.getBoundingClientRect();
@@ -330,48 +343,73 @@
             });
 
             canvas.addEventListener("click", () => {
-                if (setupDone || !hoveredTile) return;
+                if (setupDone) return;
 
-                // Can only place 5 ships
-                if (currentSetupPlayer === "bottom") {
-                    if (!hoveredTile.isShip && bottomShipsPlaced >= 5) return;
+                const aspect = canvas.width / canvas.height;
+                const ray = rayFromMouse(mouseX, mouseY, aspect, Math.PI / 3, cameraPos, cameraTarget, cameraUp);
 
-                    // toggle ship placement
-                    if (hoveredTile.isShip) {
-                        hoveredTile.isShip = false;
-                        bottomShipsPlaced--;
-                    } 
-                    else {
-                        hoveredTile.isShip = true;
-                        bottomShipsPlaced++;
-                    }
+                // side ships live on their own plane
+                const sideHit = intersectRayWithZPlane(ray.origin, ray.direction, 0.35);
 
-                    // once bottom finishes, switch to top
-                    if (bottomShipsPlaced === 5) {
-                        cameraPos = [...cameraB.position];
-                        cameraTarget = [...cameraB.target];
-                        cameraUp = [0, 1, 0];
-
-                        currentSetupPlayer = "top";
-                        isPlayerBView = true;
+                if (sideHit) {
+                    const picked = pickShipFromSide(sideHit[0], -sideHit[1]);
+                    if (picked) {
+                        selectedShip = picked;
+                        previewCells = [];
+                        return;
                     }
                 }
 
-                else if (currentSetupPlayer === "top") {
-                    if (!hoveredTile.isShip && topShipsPlaced >= 5) return;
+                // grid placement lives on the grid plane
+                const gridHit = intersectRayWithZPlane(ray.origin, ray.direction, -0.10);
+                if (!gridHit) return;
 
-                    if (hoveredTile.isShip) {
-                        hoveredTile.isShip = false;
-                        topShipsPlaced--;
-                    } 
-                    else {
-                        hoveredTile.isShip = true;
-                        topShipsPlaced++;
-                    }
+                if (!selectedShip) return;
+                if (previewCells.length !== selectedShip.length) return;
 
-                    if (topShipsPlaced === 5) {
-                        setupDone = true;
-                    }
+                const activeFleet = currentSetupPlayer === "bottom" ? playerAFleet : playerBFleet;
+
+                selectedShip.placed = true;
+                selectedShip.cells = [...previewCells];
+                activeFleet.push(selectedShip);
+
+                selectedShip = null;
+                previewCells = [];
+            });
+
+            // Rotate ship button
+            document.getElementById("rotateShipBtn").addEventListener("click", () => {
+                if (selectedShip) {
+                    selectedShip.horizontal = !selectedShip.horizontal;
+                    updateShipPreview();
+                }
+            });
+            // User can also press "R" key to rotate ship
+            window.addEventListener("keydown", (e) => {
+                if (e.key.toLowerCase() === "r" && selectedShip) {
+                    selectedShip.horizontal = !selectedShip.horizontal;
+                    updateShipPreview();
+                }
+            });
+
+            // Confirm turn button
+            document.getElementById("confirmTurnBtn").addEventListener("click", () => {
+                const allPlaced = availableShips.every(ship => ship.placed);
+                if (!allPlaced) return;
+
+                if (currentSetupPlayer === "bottom") {
+                    cameraPos = [...cameraB.position];
+                    cameraTarget = [...cameraB.target];
+                    cameraUp = [0, 1, 0];
+
+                    currentSetupPlayer = "top";
+                    isPlayerBView = true;
+
+                    selectedShip = null;
+                    previewCells = [];
+                    availableShips = makeFleetForCurrentPlayer();
+                } else {
+                    setupDone = true;
                 }
             });
 
@@ -484,6 +522,99 @@
                 ];
             }
 
+            // Make ships
+            function makeFleetForCurrentPlayer() {
+                return SHIP_LENGTHS.map((len, i) => ({
+                    id: i,
+                    length: len,
+                    horizontal: true,
+                    placed: false,
+                    cells: [],
+                    sideX: currentSetupPlayer === "bottom" ? 1.35 : -1.35,
+                    sideY: 0.55 - i * 0.18
+                }));
+            }
+
+            // Check if a point is inside a rectangle (used for picking ships on the side)
+            function pickShipFromSide(worldX, worldY) {
+                for (let ship of availableShips) {
+                    if (ship.placed) continue;
+
+                    const width = ship.horizontal ? ship.length * 0.05 : 0.05;
+                    const height = ship.horizontal ? 0.05 : ship.length * 0.05;
+
+                    if (pointInRect(worldX, worldY, ship.sideX, ship.sideY, width, height)) {
+                        return ship;
+                    }
+                }
+                return null;
+            }
+
+            // Shows preview of where your ship will be on the grid
+            function updateShipPreview() {
+                previewCells = [];
+
+                if (!selectedShip) return;
+                if (!hoveredTile) return;
+
+                const activeGrid = currentSetupPlayer === "bottom" ? gridBottom : gridTop;
+                const activeFleet = currentSetupPlayer === "bottom" ? playerAFleet : playerBFleet;
+
+                const cells = getPlacementCells(
+                    hoveredTile,
+                    selectedShip.length,
+                    selectedShip.horizontal,
+                    activeGrid
+                );
+
+                if (!cells) return;
+                if (cellsOverlapPlacedShip(cells, activeFleet)) return;
+
+                previewCells = cells;
+            }
+
+            // Draw ships on the side that haven't been placed yet
+            function drawSideShips() {
+                const flipY = -1;
+
+                for (let ship of availableShips) {
+                    if (ship.placed) continue;
+
+                    const tileSize = 0.05;
+                    const width = ship.horizontal ? ship.length * tileSize : tileSize;
+                    const height = ship.horizontal ? tileSize : ship.length * tileSize;
+
+                    const halfW = width / 2;
+                    const halfH = height / 2;
+
+                    const shipZ = 0.35;
+
+                    const verts = [
+                        ship.sideX - halfW, ship.sideY - halfH, shipZ,
+                        ship.sideX + halfW, ship.sideY - halfH, shipZ,
+                        ship.sideX + halfW, ship.sideY + halfH, shipZ,
+
+                        ship.sideX - halfW, ship.sideY - halfH, shipZ,
+                        ship.sideX + halfW, ship.sideY + halfH, shipZ,
+                        ship.sideX - halfW, ship.sideY + halfH, shipZ
+                    ];
+
+                    const cols = Array(6).fill().flatMap(() =>
+                        selectedShip && selectedShip.id === ship.id
+                            ? [1.0, 0.8, 0.2]
+                            : [0.7, 0.7, 0.7]
+                    );
+
+                    const inds = [0, 1, 2, 3, 4, 5];
+                    const shape = new Shape(verts, cols, inds);
+                    shape.size[1] = flipY;
+                    if (selectedShip && selectedShip.id === ship.id) {
+                        console.log("selected ship", ship.id, ship.length);
+                    }
+                    shape.render();
+                }
+            }
+
             function animate(){
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -525,22 +656,24 @@
                 divider.render();
 
                 gridTop.forEach(tile => {
-                    if (tile.isShip) {
-                        tile.color = [1.0, 0.0, 0.0];   // red
-                    } 
-                    else {
-                        tile.color = [0.10, 0.50, 0.90]; // blue
-                    }
+                    tile.color = [0.10, 0.50, 0.90];
                 });
 
                 gridBottom.forEach(tile => {
-                    if (tile.isShip) {
-                        tile.color = [1.0, 0.0, 0.0];
-                    } 
-                    else {
-                        tile.color = [0.10, 0.50, 0.90];
-                    }
+                    tile.color = [0.10, 0.50, 0.90];
                 });
+
+                for (let ship of playerAFleet) {
+                    for (let cell of ship.cells) {
+                        cell.color = [1.0, 0.0, 0.0];
+                    }
+                }
+
+                for (let ship of playerBFleet) {
+                    for (let cell of ship.cells) {
+                        cell.color = [1.0, 0.0, 0.0];
+                    }
+                }
 
                 // Hovered detection
                 const ray = rayFromMouse(mouseX, mouseY, aspect, Math.PI / 3, cameraPos, cameraTarget, cameraUp);
@@ -567,8 +700,14 @@
                     hoveredTile.color = [1.0, 1.0, 0.6];
                 }
 
+                updateShipPreview();
+                drawSideShips();
+
                 // Render tiles
                 gridTop.forEach(tile => {
+                    for (let cell of previewCells) {
+                        cell.color = [0.8, 0.8, 0.8];
+                    }
                     tile.fill.colors = Array(6).fill().flatMap(() => tile.color);
                     tile.fill.size[1] = flipY;
                     tile.outline.size[1] = flipY;
@@ -578,6 +717,9 @@
                 });
 
                 gridBottom.forEach(tile => {
+                    for (let cell of previewCells) {
+                        cell.color = [0.8, 0.8, 0.8];
+                    }
                     tile.fill.colors = Array(6).fill().flatMap(() => tile.color);
                     tile.fill.size[1] = flipY;
                     tile.outline.size[1] = flipY;
