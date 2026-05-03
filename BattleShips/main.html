@@ -5,10 +5,24 @@
     <script src="WebGL.js"></script>
     <script src="Functions.js"></script>
     <body>
-        <button id="rotateShipBtn">Rotate Ship</button>
-        <button id="confirmTurnBtn">Confirm Turn</button>
-        <br>
-        <canvas id="example" tabindex="0" width="1000" height="700" style="border:5px solid black;"></canvas>
+        <div id="game-wrapper" style="position:relative; display:inline-block;">
+            <div id="hud" style="position:absolute; top:10px; left:10px; color:#fff; font-family:monospace; font-size:14px; background:rgba(0,0,0,1.00); padding:6px 12px; border-radius:4px; z-index:10; pointer-events:none;">
+                Player A: Place your ships
+            </div>
+            <div id="ship-status" style="position:absolute; top:10px; right:10px; color:#fff; font-family:monospace; font-size:12px; background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:4px; z-index:10; pointer-events:none; display:none;"></div>
+            <div id="transition-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,1.00); z-index:20; cursor:pointer; justify-content:center; align-items:center; flex-direction:column;">
+                <div style="color:#fff; font-family:monospace; font-size:28px; text-align:center;" id="transition-text">Pass device to the other player</div>
+                <div style="color:#aaa; font-family:monospace; font-size:16px; margin-top:16px; text-align:center;">Click anywhere to continue</div>
+            </div>
+            <div id="gameover-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,1.00); z-index:30; justify-content:center; align-items:center;">
+                <div style="color:#fff; font-family:monospace; font-size:36px; text-align:center;" id="gameover-text">Game Over!</div>
+            </div>
+            <div style="margin-bottom:4px;">
+                <button id="rotateShipBtn">Rotate Ship (R)</button>
+                <button id="confirmTurnBtn">Confirm Placement</button>
+            </div>
+            <canvas id="example" tabindex="0" width="1000" height="700" style="border:5px solid black;"></canvas>
+        </div>
         <script id="vertex-shader" type="x-shader/x-vertex">
             #version 300 es                 // Use GLSL ES 3.00 (required for WebGL 2)
             
@@ -306,14 +320,18 @@
             var grassTop = new Shape(grassTopVertices, grassColors, waterIndices);
             var grassBottom = new Shape(grassBottomVertices, grassColors, waterIndices);
 
-            var gridTop = createTileGrid(0.0, 0.30, 0.05, 0.0, 8);
-            var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 8);
+            var gridTop = createTileGrid(0.0, 0.30, 0.05, 0.0, 9);
+            var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 9);
 
             // Game state variables
+            // Phases: "setup_a", "setup_b", "transition", "attack", "game_over"
+            let gamePhase = "setup_a";
             let currentSetupPlayer = "bottom"; // "top" or "bottom"
             let isPlayerBView = false;
+
             //Ship Placements
-            const SHIP_LENGTHS = [5, 4, 3, 3, 2];
+            const SHIP_LENGTHS = [5, 4, 3, 2];
+            const SHIP_NAMES = ["Carrier", "Battleship", "Cruiser", "Destroyer"];
 
             let playerAFleet = [];
             let playerBFleet = [];
@@ -322,12 +340,29 @@
             let selectedShip = null;
             let previewCells = [];
 
-            let setupDone = false;
+            // Attack phase tracking
+            let currentAttacker = "A"; // "A" or "B"
+            let playerAHits = new Set();  // keys of tiles A has hit on B's grid
+            let playerAMisses = new Set();
+            let playerBHits = new Set();  // keys of tiles B has hit on A's grid
+            let playerBMisses = new Set();
+            let winner = null;
+            let lastShotResult = null; // {type: "hit"|"miss"|"sunk", tile, ship?}
 
             let hoveredTile = null;
 
             let mouseX = 0;
             let mouseY = 0;
+
+            // UI element references
+            const hudEl = document.getElementById("hud");
+            const shipStatusEl = document.getElementById("ship-status");
+            const transitionOverlay = document.getElementById("transition-overlay");
+            const transitionText = document.getElementById("transition-text");
+            const gameoverOverlay = document.getElementById("gameover-overlay");
+            const gameoverText = document.getElementById("gameover-text");
+            const confirmBtn = document.getElementById("confirmTurnBtn");
+            const rotateBtn = document.getElementById("rotateShipBtn");
 
             availableShips = makeFleetForCurrentPlayer();
 
@@ -343,42 +378,98 @@
             });
 
             canvas.addEventListener("click", () => {
-                if (setupDone) return;
+                if (gamePhase === "transition" || gamePhase === "game_over") return;
 
                 const aspect = canvas.width / canvas.height;
                 const ray = rayFromMouse(mouseX, mouseY, aspect, Math.PI / 3, cameraPos, cameraTarget, cameraUp);
 
-                // side ships live on their own plane
-                const sideHit = intersectRayWithZPlane(ray.origin, ray.direction, 0.35);
-
-                if (sideHit) {
-                    const picked = pickShipFromSide(sideHit[0], -sideHit[1]);
-                    if (picked) {
-                        selectedShip = picked;
-                        previewCells = [];
-                        return;
+                // --- SETUP PHASES ---
+                if (gamePhase === "setup_a" || gamePhase === "setup_b") {
+                    // side ships live on their own plane
+                    const sideHit = intersectRayWithZPlane(ray.origin, ray.direction, 0.35);
+                    if (sideHit) {
+                        const picked = pickShipFromSide(sideHit[0], -sideHit[1]);
+                        if (picked) {
+                            selectedShip = picked;
+                            previewCells = [];
+                            return;
+                        }
                     }
+
+                    // grid placement lives on the grid plane
+                    const gridHit = intersectRayWithZPlane(ray.origin, ray.direction, -0.10);
+                    if (!gridHit) return;
+                    if (!selectedShip) return;
+                    if (previewCells.length !== selectedShip.length) return;
+
+                    const activeFleet = currentSetupPlayer === "bottom" ? playerAFleet : playerBFleet;
+                    selectedShip.placed = true;
+                    selectedShip.cells = [...previewCells];
+                    activeFleet.push(selectedShip);
+                    selectedShip = null;
+                    previewCells = [];
+                    return;
                 }
 
-                // grid placement lives on the grid plane
-                const gridHit = intersectRayWithZPlane(ray.origin, ray.direction, -0.10);
-                if (!gridHit) return;
+                // --- ATTACK PHASE ---
+                if (gamePhase === "attack") {
+                    const gridHit = intersectRayWithZPlane(ray.origin, ray.direction, -0.10);
+                    if (!gridHit) return;
 
-                if (!selectedShip) return;
-                if (previewCells.length !== selectedShip.length) return;
+                    let hoverX = gridHit[0];
+                    let hoverY = -gridHit[1]; // flip for size[1] = -1
 
-                const activeFleet = currentSetupPlayer === "bottom" ? playerAFleet : playerBFleet;
+                    // Attacker fires at the OPPONENT's grid
+                    const targetGrid = currentAttacker === "A" ? gridTop : gridBottom;
+                    const targetFleet = currentAttacker === "A" ? playerBFleet : playerAFleet;
+                    const hitSet = currentAttacker === "A" ? playerAHits : playerBHits;
+                    const missSet = currentAttacker === "A" ? playerAMisses : playerBMisses;
 
-                selectedShip.placed = true;
-                selectedShip.cells = [...previewCells];
-                activeFleet.push(selectedShip);
+                    const clickedTile = getHoveredTile(hoverX, hoverY, targetGrid);
+                    if (!clickedTile) return;
 
-                selectedShip = null;
-                previewCells = [];
+                    const key = getTileKey(clickedTile);
+
+                    // Don't allow firing on same tile twice
+                    if (hitSet.has(key) || missSet.has(key)) return;
+
+                    const hitShip = checkHit(clickedTile, targetFleet);
+
+                    if (hitShip) {
+                        hitSet.add(key);
+                        if (isShipSunk(hitShip, hitSet)) {
+                            lastShotResult = { type: "sunk", tile: clickedTile, ship: hitShip };
+                        } else {
+                            lastShotResult = { type: "hit", tile: clickedTile };
+                        }
+
+                        // Check for win
+                        if (isFleetSunk(targetFleet, hitSet)) {
+                            winner = currentAttacker;
+                            gamePhase = "game_over";
+                            gameoverText.textContent = "Player " + winner + " Wins!";
+                            gameoverOverlay.style.display = "flex";
+                            confirmBtn.style.display = "none";
+                            rotateBtn.style.display = "none";
+                            updateHUD();
+                            return;
+                        }
+                    } else {
+                        missSet.add(key);
+                        lastShotResult = { type: "miss", tile: clickedTile };
+                    }
+
+                    updateHUD();
+
+                    // After firing, swap to transition
+                    setTimeout(() => {
+                        showTransition();
+                    }, 800);
+                }
             });
 
             // Rotate ship button
-            document.getElementById("rotateShipBtn").addEventListener("click", () => {
+            rotateBtn.addEventListener("click", () => {
                 if (selectedShip) {
                     selectedShip.horizontal = !selectedShip.horizontal;
                     updateShipPreview();
@@ -392,26 +483,142 @@
                 }
             });
 
-            // Confirm turn button
-            document.getElementById("confirmTurnBtn").addEventListener("click", () => {
-                const allPlaced = availableShips.every(ship => ship.placed);
-                if (!allPlaced) return;
+            // Confirm turn button (setup phases only)
+            confirmBtn.addEventListener("click", () => {
+                if (gamePhase === "setup_a") {
+                    const allPlaced = availableShips.every(ship => ship.placed);
+                    if (!allPlaced) return;
 
-                if (currentSetupPlayer === "bottom") {
-                    cameraPos = [...cameraB.position];
-                    cameraTarget = [...cameraB.target];
-                    cameraUp = [0, 1, 0];
+                    gamePhase = "transition";
+                    transitionText.textContent = "Pass device to Player B";
+                    transitionOverlay.style.display = "flex";
 
-                    currentSetupPlayer = "top";
-                    isPlayerBView = true;
+                } else if (gamePhase === "setup_b") {
+                    const allPlaced = availableShips.every(ship => ship.placed);
+                    if (!allPlaced) return;
 
-                    selectedShip = null;
-                    previewCells = [];
-                    availableShips = makeFleetForCurrentPlayer();
-                } else {
-                    setupDone = true;
+                    // Both players placed, transition to attack
+                    gamePhase = "transition";
+                    transitionText.textContent = "All ships placed! Pass device to Player A";
+                    transitionOverlay.style.display = "flex";
+
+                } else if (gamePhase === "attack") {
+                    // No confirm needed during attack
                 }
             });
+
+            // Click on transition overlay to continue
+            transitionOverlay.addEventListener("click", () => {
+                transitionOverlay.style.display = "none";
+
+                if (gamePhase === "transition") {
+                    // Figure out what comes next
+                    if (playerBFleet.length === 0) {
+                        // Player A just finished, switch to Player B setup
+                        gamePhase = "setup_b";
+                        cameraPos = [...cameraB.position];
+                        cameraTarget = [...cameraB.target];
+                        cameraUp = [0, 1, 0];
+                        currentSetupPlayer = "top";
+                        isPlayerBView = true;
+                        selectedShip = null;
+                        previewCells = [];
+                        availableShips = makeFleetForCurrentPlayer();
+                        confirmBtn.textContent = "Confirm Placement";
+                        updateHUD();
+
+                    } else if (currentAttacker === "A" && lastShotResult) {
+                        // After A's shot, switch to B
+                        currentAttacker = "B";
+                        gamePhase = "attack";
+                        cameraPos = [...cameraB.position];
+                        cameraTarget = [...cameraB.target];
+                        cameraUp = [0, 1, 0];
+                        isPlayerBView = true;
+                        lastShotResult = null;
+                        updateHUD();
+
+                    } else if (currentAttacker === "B" && lastShotResult) {
+                        // After B's shot, switch to A
+                        currentAttacker = "A";
+                        gamePhase = "attack";
+                        cameraPos = [...cameraA.position];
+                        cameraTarget = [...cameraA.target];
+                        cameraUp = [0, -1, 0];
+                        isPlayerBView = false;
+                        lastShotResult = null;
+                        updateHUD();
+
+                    } else {
+                        // Both setups done, start attack phase with Player A
+                        gamePhase = "attack";
+                        currentAttacker = "A";
+                        cameraPos = [...cameraA.position];
+                        cameraTarget = [...cameraA.target];
+                        cameraUp = [0, -1, 0];
+                        isPlayerBView = false;
+                        confirmBtn.style.display = "none";
+                        rotateBtn.style.display = "none";
+                        shipStatusEl.style.display = "block";
+                        lastShotResult = null;
+                        updateHUD();
+                    }
+                }
+            });
+
+            // Update the HUD text
+            function updateHUD() {
+                if (gamePhase === "setup_a") {
+                    hudEl.textContent = "Player A: Place your ships";
+                } else if (gamePhase === "setup_b") {
+                    hudEl.textContent = "Player B: Place your ships";
+                } else if (gamePhase === "attack") {
+                    let msg = "Player " + currentAttacker + "'s turn — Click opponent's grid to fire";
+                    if (lastShotResult) {
+                        if (lastShotResult.type === "hit") msg = "Player " + currentAttacker + ": HIT!";
+                        else if (lastShotResult.type === "miss") msg = "Player " + currentAttacker + ": Miss...";
+                        else if (lastShotResult.type === "sunk") msg = "Player " + currentAttacker + ": SUNK the " + SHIP_NAMES[lastShotResult.ship.id] + "!";
+                    }
+                    hudEl.textContent = msg;
+                } else if (gamePhase === "game_over") {
+                    hudEl.textContent = "Game Over — Player " + winner + " wins!";
+                }
+                updateShipStatus();
+            }
+
+            // Update the ship status sidebar
+            function updateShipStatus() {
+                if (gamePhase !== "attack" && gamePhase !== "game_over") {
+                    shipStatusEl.style.display = "none";
+                    return;
+                }
+                shipStatusEl.style.display = "block";
+
+                const myFleet = currentAttacker === "A" ? playerAFleet : playerBFleet;
+                const myHitsAgainst = currentAttacker === "A" ? playerBHits : playerAHits;
+                const oppFleet = currentAttacker === "A" ? playerBFleet : playerAFleet;
+                const oppHits = currentAttacker === "A" ? playerAHits : playerBHits;
+
+                let html = "<b>Your Ships:</b><br>";
+                for (let ship of myFleet) {
+                    const sunk = isShipSunk(ship, myHitsAgainst);
+                    html += (sunk ? "☠ " : "🚢 ") + SHIP_NAMES[ship.id] + " (" + ship.length + ")<br>";
+                }
+                html += "<br><b>Enemy Ships:</b><br>";
+                for (let ship of oppFleet) {
+                    const sunk = isShipSunk(ship, oppHits);
+                    html += (sunk ? "☠ " : "? ") + SHIP_NAMES[ship.id] + " (" + ship.length + ")" + (sunk ? " SUNK" : "") + "<br>";
+                }
+                shipStatusEl.innerHTML = html;
+            }
+
+            // Show the transition overlay
+            function showTransition() {
+                gamePhase = "transition";
+                const nextPlayer = currentAttacker === "A" ? "B" : "A";
+                transitionText.textContent = "Pass device to Player " + nextPlayer;
+                transitionOverlay.style.display = "flex";
+            }
 
             // key listeners
             window.addEventListener("keydown", (e) => {
@@ -522,7 +729,7 @@
                 ];
             }
 
-            // Make ships
+            // Make ships - positioned in front of each player's grid
             function makeFleetForCurrentPlayer() {
                 return SHIP_LENGTHS.map((len, i) => ({
                     id: i,
@@ -530,8 +737,10 @@
                     horizontal: true,
                     placed: false,
                     cells: [],
-                    sideX: currentSetupPlayer === "bottom" ? 1.35 : -1.35,
-                    sideY: 0.55 - i * 0.18
+                    sideX: 0,
+                    sideY: currentSetupPlayer === "bottom"
+                        ? -1.05 - i * 0.09
+                        :  1.05 + i * 0.09
                 }));
             }
 
@@ -655,75 +864,128 @@
                 Water.render();
                 divider.render();
 
-                gridTop.forEach(tile => {
-                    tile.color = [0.10, 0.50, 0.90];
-                });
+                // --- Tile coloring logic ---
+                // Reset all tiles to default blue
+                gridTop.forEach(tile => { tile.color = [0.10, 0.50, 0.90]; });
+                gridBottom.forEach(tile => { tile.color = [0.10, 0.50, 0.90]; });
 
-                gridBottom.forEach(tile => {
-                    tile.color = [0.10, 0.50, 0.90];
-                });
+                if (gamePhase === "setup_a" || gamePhase === "setup_b") {
+                    // Show placed ships for CURRENT player only
+                    const setupFleet = gamePhase === "setup_a" ? playerAFleet : playerBFleet;
+                    for (let ship of setupFleet) {
+                        for (let cell of ship.cells) {
+                            cell.color = [0.5, 0.5, 0.5];
+                        }
+                    }
+                } else if (gamePhase === "attack" || gamePhase === "transition" || gamePhase === "game_over") {
+                    // Current player sees their OWN ships as gray
+                    const myFleet = currentAttacker === "A" ? playerAFleet : playerBFleet;
+                    const myGrid = currentAttacker === "A" ? gridBottom : gridTop;
 
-                for (let ship of playerAFleet) {
-                    for (let cell of ship.cells) {
-                        cell.color = [1.0, 0.0, 0.0];
+                    for (let ship of myFleet) {
+                        for (let cell of ship.cells) {
+                            cell.color = [0.5, 0.5, 0.5];
+                        }
+                    }
+
+                    // Show hits/misses on the opponent's grid
+                    const oppGrid = currentAttacker === "A" ? gridTop : gridBottom;
+                    const oppFleet = currentAttacker === "A" ? playerBFleet : playerAFleet;
+                    const myHits = currentAttacker === "A" ? playerAHits : playerBHits;
+                    const myMisses = currentAttacker === "A" ? playerAMisses : playerBMisses;
+
+                    // Show hits as red, sunk as dark red
+                    for (let tile of oppGrid) {
+                        const key = getTileKey(tile);
+                        if (myHits.has(key)) {
+                            // Check if the ship this tile belongs to is fully sunk
+                            const ship = checkHit(tile, oppFleet);
+                            if (ship && isShipSunk(ship, myHits)) {
+                                tile.color = [0.6, 0.0, 0.0]; // dark red = sunk
+                            } else {
+                                tile.color = [1.0, 0.2, 0.1]; // red = hit
+                            }
+                        } else if (myMisses.has(key)) {
+                            tile.color = [0.9, 0.9, 0.9]; // white = miss
+                        }
+                        // opponent ships stay hidden (blue) if not hit
+                    }
+
+                    // Also show hits the OPPONENT made on YOUR grid
+                    const theirHits = currentAttacker === "A" ? playerBHits : playerAHits;
+                    const theirMisses = currentAttacker === "A" ? playerBMisses : playerAMisses;
+
+                    for (let tile of myGrid) {
+                        const key = getTileKey(tile);
+                        if (theirHits.has(key)) {
+                            tile.color = [1.0, 0.2, 0.1]; // red = hit on your ship
+                        } else if (theirMisses.has(key)) {
+                            tile.color = [0.9, 0.9, 0.9]; // white = miss
+                        }
                     }
                 }
 
-                for (let ship of playerBFleet) {
-                    for (let cell of ship.cells) {
-                        cell.color = [1.0, 0.0, 0.0];
-                    }
-                }
-
-                // Hovered detection
+                // Hover detection
                 const ray = rayFromMouse(mouseX, mouseY, aspect, Math.PI / 3, cameraPos, cameraTarget, cameraUp);
                 const hitPoint = intersectRayWithZPlane(ray.origin, ray.direction, -0.10);
 
                 hoveredTile = null;
 
-                if (hitPoint && !setupDone) {
+                if (hitPoint) {
                     let hoverX = hitPoint[0];
-                    let hoverY = hitPoint[1];
+                    let hoverY = -hitPoint[1]; // because of size[1] = -1 flip
 
-                    // because you flip everything with size[1] = -1
-                    hoverY = -hoverY;
+                    if (gamePhase === "setup_a" || gamePhase === "setup_b") {
+                        if (currentSetupPlayer === "bottom") {
+                            hoveredTile = getHoveredTile(hoverX, hoverY, gridBottom);
+                        } else if (currentSetupPlayer === "top") {
+                            hoveredTile = getHoveredTile(hoverX, hoverY, gridTop);
+                        }
+                    } else if (gamePhase === "attack") {
+                        // Hover on the opponent's grid only
+                        const targetGrid = currentAttacker === "A" ? gridTop : gridBottom;
+                        hoveredTile = getHoveredTile(hoverX, hoverY, targetGrid);
 
-                    if (currentSetupPlayer === "bottom") {
-                        hoveredTile = getHoveredTile(hoverX, hoverY, gridBottom);
-                    } 
-                    else if (currentSetupPlayer === "top") {
-                        hoveredTile = getHoveredTile(hoverX, hoverY, gridTop);
+                        // Only highlight if the tile hasn't been shot yet
+                        if (hoveredTile) {
+                            const key = getTileKey(hoveredTile);
+                            const hitSet = currentAttacker === "A" ? playerAHits : playerBHits;
+                            const missSet = currentAttacker === "A" ? playerAMisses : playerBMisses;
+                            if (hitSet.has(key) || missSet.has(key)) {
+                                hoveredTile = null; // don't highlight already-shot tiles
+                            }
+                        }
                     }
                 }
 
-                if (hoveredTile && !hoveredTile.isShip) {
-                    hoveredTile.color = [1.0, 1.0, 0.6];
+                if (hoveredTile) {
+                    hoveredTile.color = [1.0, 1.0, 0.6]; // yellow hover
                 }
 
-                updateShipPreview();
-                drawSideShips();
+                // Ship preview and side ships (setup only)
+                if (gamePhase === "setup_a" || gamePhase === "setup_b") {
+                    updateShipPreview();
+                    drawSideShips();
+                }
+
+                // Apply preview cell coloring
+                for (let cell of previewCells) {
+                    cell.color = [0.8, 0.8, 0.8];
+                }
 
                 // Render tiles
                 gridTop.forEach(tile => {
-                    for (let cell of previewCells) {
-                        cell.color = [0.8, 0.8, 0.8];
-                    }
                     tile.fill.colors = Array(6).fill().flatMap(() => tile.color);
                     tile.fill.size[1] = flipY;
                     tile.outline.size[1] = flipY;
-
                     tile.fill.render();
                     tile.outline.render();
                 });
 
                 gridBottom.forEach(tile => {
-                    for (let cell of previewCells) {
-                        cell.color = [0.8, 0.8, 0.8];
-                    }
                     tile.fill.colors = Array(6).fill().flatMap(() => tile.color);
                     tile.fill.size[1] = flipY;
                     tile.outline.size[1] = flipY;
-
                     tile.fill.render();
                     tile.outline.render();
                 });

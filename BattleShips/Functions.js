@@ -371,3 +371,40 @@ function pointInRect(x, y, cx, cy, w, h) {
         y <= cy + h / 2
     );
 }
+
+// Returns a unique string key for a tile based on its row and column
+function getTileKey(tile) {
+    return tile.row + "," + tile.col;
+}
+
+// Checks if a tile is part of any ship in the fleet. Returns the ship if found, else null.
+function checkHit(tile, fleet) {
+    for (let ship of fleet) {
+        for (let cell of ship.cells) {
+            if (cell.row === tile.row && cell.col === tile.col) {
+                return ship;
+            }
+        }
+    }
+    return null;
+}
+
+// Returns true if every cell of a ship has been hit
+function isShipSunk(ship, hitSet) {
+    for (let cell of ship.cells) {
+        if (!hitSet.has(getTileKey(cell))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Returns true if every ship in the fleet is sunk
+function isFleetSunk(fleet, hitSet) {
+    for (let ship of fleet) {
+        if (!isShipSunk(ship, hitSet)) {
+            return false;
+        }
+    }
+    return true;
+}
