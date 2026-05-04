@@ -20,7 +20,7 @@ class WebGL {
     // Set the viewport to match the canvas size
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     
-    // Set the clear color to light blue
+    // Set the clear color to white
     gl.clearColor(0.53, 0.81, 0.92, 1.0);
 
     // Clear the color and depth buffers
@@ -28,6 +28,8 @@ class WebGL {
 
     // Enable depth testing for correct 3D rendering
     gl.enable(gl.DEPTH_TEST);
+    // gl.enable(gl.CULL_FACE);
+    // gl.cullFace(gl.BACK);
 
     // Tell WebGL to use this shader program
     gl.useProgram(this.program);
@@ -61,9 +63,14 @@ class WebGL {
 
     // Clean up the failed shader
     gl.deleteShader(shader);
+    return null;
   }
   
   createProgram(vs, fs) {
+    if (!vs || !fs) {
+      throw new Error("Shader compilation failed. Check the GLSL source above.");
+    }
+
     // Create a new WebGL program
     var program = gl.createProgram();
 
@@ -98,6 +105,7 @@ class WebGL {
 
     // Clean up the failed program
     gl.deleteProgram(program);
+    return null;
   }
   // Make this program the active one
   use() {
