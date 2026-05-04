@@ -424,7 +424,24 @@
 
             var waterIndices = [0,1,2, 3,4,5];
 
-            var Water = new Shape(waterVertices, waterIndices);
+            var waterTextureCoordinates = [
+                0.0, 0.0,
+                4.0, 0.0,
+                4.0, 4.0,
+
+                0.0, 0.0,
+                4.0, 4.0,
+                0.0, 4.0
+            ];
+
+            var Water = new Shape(
+                waterVertices,
+                waterIndices,
+                waterTextureCoordinates,
+                CreateImageTexture("textures/water 0342.png", gl.REPEAT, gl.LINEAR, gl.LINEAR),
+                CreateImageTexture("textures/water 0342normal.jpg", gl.REPEAT, gl.LINEAR, gl.LINEAR)
+            );
+            Water.bumpStrength = 1.8;
             
             // Sand for beach
             var sandLeftVertices = [
@@ -521,15 +538,34 @@
             var divider = new Shape(dividerVertices, dividerIndices);
             divider.drawMode = gl.LINES;
 
-            var sandLeft = new Shape(sandLeftVertices, waterIndices);
-            var sandRight = new Shape(sandRightVertices, waterIndices);
-            var sandTop = new Shape(sandTopVertices, waterIndices);
-            var sandBottom = new Shape(sandBottomVertices, waterIndices);
+            var sandColorTexture = CreateImageTexture("textures/worn_rock_natural_01_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var sandNormalTexture = CreateImageTexture("textures/worn_rock_natural_01_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
 
-            var grassLeft = new Shape(grassLeftVertices, waterIndices);
-            var grassRight = new Shape(grassRightVertices, waterIndices);
-            var grassTop = new Shape(grassTopVertices, waterIndices);
-            var grassBottom = new Shape(grassBottomVertices, waterIndices);
+            var sandLeft = new Shape(sandLeftVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
+            var sandRight = new Shape(sandRightVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
+            var sandTop = new Shape(sandTopVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
+            var sandBottom = new Shape(sandBottomVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
+
+            var grassColorTexture = CreateImageTexture("textures/brown_mud_leaves_01_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var grassNormalTexture = CreateImageTexture("textures/brown_mud_leaves_01_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var grassTextureCoordinates = [
+                0.0, 0.0,
+                4.0, 0.0,
+                4.0, 4.0,
+
+                0.0, 0.0,
+                4.0, 4.0,
+                0.0, 4.0
+            ];
+
+            var grassLeft = new Shape(grassLeftVertices, waterIndices, grassTextureCoordinates, grassColorTexture, grassNormalTexture);
+            var grassRight = new Shape(grassRightVertices, waterIndices, grassTextureCoordinates, grassColorTexture, grassNormalTexture);
+            var grassTop = new Shape(grassTopVertices, waterIndices, grassTextureCoordinates, grassColorTexture, grassNormalTexture);
+            var grassBottom = new Shape(grassBottomVertices, waterIndices, grassTextureCoordinates, grassColorTexture, grassNormalTexture);
+            grassLeft.bumpStrength = 1.4;
+            grassRight.bumpStrength = 1.4;
+            grassTop.bumpStrength = 1.4;
+            grassBottom.bumpStrength = 1.4;
 
             var gridTop = createTileGrid(0.0, 0.30, 0.05, 0.0, 9);
             var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 9);
