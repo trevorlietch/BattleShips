@@ -4,26 +4,24 @@ function createShipModels() {
     const Boat3Colors = createBoat3Colors(Boat3Vertices);
     const Boat4Colors = createBoat4Colors(Boat4Vertices);
 
-    const Boat1 = new Shape(Boat1Vertices, Boat1Colors, Boat1Indices);
+    const Boat1 = new ShapeWithColor(Boat1Vertices, Boat1Colors, Boat1Indices);
     Boat1.position = [0.0, 0.55, -0.08];
-    Boat1.rotZ = Math.PI / 2;
-    Boat1.rotX = 0.0;
+    Boat1.rotation = [0.0, 0.0, Math.PI / 2];
     Boat1.size = [0.06, 0.08, 0.06];
 
-    const Boat2 = new Shape(Boat2Vertices, Boat2Colors, Boat2Indices);
+    const Boat2 = new ShapeWithColor(Boat2Vertices, Boat2Colors, Boat2Indices);
     Boat2.position = [0.0, 0.45, -0.08];
-    Boat2.rotZ = Math.PI / 2;
-    Boat2.rotX = 0.0;
+    Boat2.rotation = [0.0, 0.0, Math.PI / 2];
     Boat2.size = [0.03, 0.033, 0.035];
 
-    const Boat3 = new Shape(Boat3Vertices, Boat3Colors, Boat3Indices);
+    const Boat3 = new ShapeWithColor(Boat3Vertices, Boat3Colors, Boat3Indices);
     Boat3.position = [0.0, 0.35, -0.08];
-    Boat3.rotZ = Math.PI / 2;
+    Boat3.rotation = [0.0, 0.0, Math.PI / 2];
     Boat3.size = [0.026, 0.036, 0.026];
 
-    const Boat4 = new Shape(Boat4Vertices, Boat4Colors, Boat4Indices);
+    const Boat4 = new ShapeWithColor(Boat4Vertices, Boat4Colors, Boat4Indices);
     Boat4.position = [0.0, 0.25, -0.08];
-    Boat4.rotZ = Math.PI / 2;
+    Boat4.rotation = [0.0, 0.0, Math.PI / 2];
     Boat4.size = [0.026, 0.036, 0.026];
 
     return { Boat1, Boat2, Boat3, Boat4 };
