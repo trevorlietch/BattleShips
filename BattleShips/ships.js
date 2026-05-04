@@ -5,17 +5,17 @@ function createShipModels() {
     const Boat4Colors = createBoat4Colors(Boat4Vertices);
 
     const Boat1 = new ShapeWithColor(Boat1Vertices, Boat1Colors, Boat1Indices);
-    Boat1.position = [0.0, 0.55, -0.08];
+    Boat1.position = [0.0, 0.55, -0.1];
     Boat1.rotation = [0.0, 0.0, Math.PI / 2];
     Boat1.size = [0.06, 0.08, 0.06];
 
     const Boat2 = new ShapeWithColor(Boat2Vertices, Boat2Colors, Boat2Indices);
-    Boat2.position = [0.0, 0.45, -0.08];
+    Boat2.position = [0.0, 0.45, -0.1];
     Boat2.rotation = [0.0, 0.0, Math.PI / 2];
     Boat2.size = [0.03, 0.033, 0.035];
 
     const Boat3 = new ShapeWithColor(Boat3Vertices, Boat3Colors, Boat3Indices);
-    Boat3.position = [0.0, 0.35, -0.08];
+    Boat3.position = [0.0, 0.35, -0.1];
     Boat3.rotation = [0.0, 0.0, Math.PI / 2];
     Boat3.size = [0.026, 0.036, 0.026];
 

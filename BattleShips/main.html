@@ -21,10 +21,6 @@
             <div id="gameover-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,1.00); z-index:30; justify-content:center; align-items:center;">
                 <div style="color:#fff; font-family:monospace; font-size:36px; text-align:center;" id="gameover-text">Game Over!</div>
             </div>
-            <div style="margin-bottom:4px;">
-                <button id="rotateShipBtn">Rotate Ship (R)</button>
-                <button id="confirmTurnBtn">Confirm Placement</button>
-            </div>
             <canvas id="example" tabindex="0" width="1000" height="700" style="border:5px solid black;"></canvas>
         </div>
         <script id="vertex-shader" type="x-shader/x-vertex">
@@ -586,8 +582,7 @@
             const transitionText = document.getElementById("transition-text");
             const gameoverOverlay = document.getElementById("gameover-overlay");
             const gameoverText = document.getElementById("gameover-text");
-            const confirmBtn = document.getElementById("confirmTurnBtn");
-            const rotateBtn = document.getElementById("rotateShipBtn");
+
 
             availableShips = makeFleetForCurrentPlayer();
 
@@ -611,7 +606,7 @@
                 // --- SETUP PHASES ---
                 if (gamePhase === "setup_a" || gamePhase === "setup_b") {
                     // side ships live on their own plane
-                    const sideHit = intersectRayWithZPlane(ray.origin, ray.direction, 0.35);
+                    const sideHit = intersectRayWithZPlane(ray.origin, ray.direction, 0.2);
                     if (sideHit) {
                         const picked = pickShipFromSide(sideHit[0], -sideHit[1]);
                         if (picked) {
@@ -633,6 +628,20 @@
                     activeFleet.push(selectedShip);
                     selectedShip = null;
                     previewCells = [];
+
+                    // Auto-confirm when all ships are placed
+                    const allPlaced = availableShips.every(ship => ship.placed);
+                    if (allPlaced) {
+                        if (gamePhase === "setup_a") {
+                            gamePhase = "transition";
+                            transitionText.textContent = "Pass device to Player B";
+                            transitionOverlay.style.display = "flex";
+                        } else if (gamePhase === "setup_b") {
+                            gamePhase = "transition";
+                            transitionText.textContent = "All ships placed! Pass device to Player A";
+                            transitionOverlay.style.display = "flex";
+                        }
+                    }
                     return;
                 }
 
@@ -674,8 +683,7 @@
                             gamePhase = "game_over";
                             gameoverText.textContent = "Player " + winner + " Wins!";
                             gameoverOverlay.style.display = "flex";
-                            confirmBtn.style.display = "none";
-                            rotateBtn.style.display = "none";
+
                             updateHUD();
                             return;
                         }
@@ -693,14 +701,7 @@
                 }
             });
 
-            // Rotate ship button
-            rotateBtn.addEventListener("click", () => {
-                if (selectedShip) {
-                    selectedShip.horizontal = !selectedShip.horizontal;
-                    updateShipPreview();
-                }
-            });
-            // User can also press "R" key to rotate ship
+            // Press "R" key to rotate ship
             window.addEventListener("keydown", (e) => {
                 if (e.key.toLowerCase() === "r" && selectedShip) {
                     selectedShip.horizontal = !selectedShip.horizontal;
@@ -708,29 +709,7 @@
                 }
             });
 
-            // Confirm turn button (setup phases only)
-            confirmBtn.addEventListener("click", () => {
-                if (gamePhase === "setup_a") {
-                    const allPlaced = availableShips.every(ship => ship.placed);
-                    if (!allPlaced) return;
 
-                    gamePhase = "transition";
-                    transitionText.textContent = "Pass device to Player B";
-                    transitionOverlay.style.display = "flex";
-
-                } else if (gamePhase === "setup_b") {
-                    const allPlaced = availableShips.every(ship => ship.placed);
-                    if (!allPlaced) return;
-
-                    // Both players placed, transition to attack
-                    gamePhase = "transition";
-                    transitionText.textContent = "All ships placed! Pass device to Player A";
-                    transitionOverlay.style.display = "flex";
-
-                } else if (gamePhase === "attack") {
-                    // No confirm needed during attack
-                }
-            });
 
             // Click on transition overlay to continue
             transitionOverlay.addEventListener("click", () => {
@@ -749,7 +728,6 @@
                         selectedShip = null;
                         previewCells = [];
                         availableShips = makeFleetForCurrentPlayer();
-                        confirmBtn.textContent = "Confirm Placement";
                         updateHUD();
 
                     } else if (currentAttacker === "A" && lastShotResult) {
@@ -782,8 +760,7 @@
                         cameraTarget = [...cameraA.target];
                         cameraUp = [0, -1, 0];
                         isPlayerBView = false;
-                        confirmBtn.style.display = "none";
-                        rotateBtn.style.display = "none";
+
                         shipStatusEl.style.display = "block";
                         lastShotResult = null;
                         updateHUD();
@@ -946,6 +923,12 @@
                     }
                 }
 
+                // Floor collision — don't let camera go below the grass
+                const floorZ = grassZ + 0.2; // small margin above the grass surface
+                if (cameraPos[2] < floorZ) {
+                    cameraPos[2] = floorZ;
+                }
+
                 // restore the same camera tilt/look
                 cameraTarget = [
                     cameraPos[0] + lookOffset[0],
@@ -1063,7 +1046,7 @@
                 const scaleX = targetWidth / bounds.width;
                 const scaleY = targetLength / bounds.length;
                 const scaleZ = Math.min(scaleX, scaleY) * (options.side ? 1.35 : 1.05);
-                model.position = [center[0], -center[1], options.side ? 0.34 : -0.075];
+                model.position = [center[0], -center[1], options.side ? 0.2 : -0.095];
                 model.size = [scaleX, scaleY, scaleZ];
                 model.rotation = [0.0, 0.0, ship.horizontal ? Math.PI / 2 : 0.0];
                 if (options.black) {
