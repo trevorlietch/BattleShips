@@ -531,6 +531,52 @@
 
             var gridTop = createTileGrid(0.0, 0.30, 0.05, 0.0, 9);
             var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 9);
+            function createTriangleRock(x, y, z) {
+                // randomness
+                const skew = (Math.random() - 0.5) * 0.25;   // left/right lean
+                const height = 0.5 + Math.random() * 0.4;    // how tall
+                const base = 0.15 + Math.random() * 0.15;      // base size
+
+                var vertices = [
+                    skew, height, 0.0,
+
+                    -base, 0.0, -base,
+                    base, 0.0, -base,
+                    base, 0.0,  base,
+                    -base, 0.0,  base
+                ];
+
+                    var indices = [
+                    0,1,2,
+                    0,2,3,
+                    0,3,4,
+                    0,4,1,
+                    1,2,3,  1,3,4
+                ];
+
+                var rock = new Shape(vertices, indices);
+                // position
+                rock.position = [x, y, z];
+
+                // random scaling variation
+                let s = 1.5 + Math.random() * 0.1;
+                rock.size = [s, s, s];
+
+                return rock;
+            }
+
+            var rocks = [];
+
+            for (let i = 0; i < 10; i++) {
+                let y = -2.2 + (i * 0.4) + (Math.random() * 0.1); 
+                let z = 0.4;                        
+
+                let xRight = 1.3;                           
+                rocks.push(createTriangleRock(xRight, y, z));
+
+                let xLeft = -1.3; 
+                rocks.push(createTriangleRock(xLeft, y, z));
+            }
 
             // Boats are made from the vertices and indices in ships.js.
             const { Boat1, Boat2, Boat3, Boat4 } = createShipModels();
@@ -920,42 +966,11 @@
                         cameraPos[1] -= moveSpeed;
                     }
                 }
-                
-                if (!window.collider) window.collider = new CollisionDetection();
-                
-                const virtualFloorObj = [cameraPos[0], cameraPos[1], grassZ];
-                const cameraRadius = 0.2; // How close the camera can get to the floor
 
-                // AABB check between camera and floor
-                if (window.collider.AABBCollider(cameraPos, virtualFloorObj, cameraRadius) || cameraPos[2] < grassZ) {
-                    cameraPos[2] = grassZ + cameraRadius;
-                }
-
-                // Wall collisions - keep camera inside the grass boundaries
-                const wallRadius = 0.2;
-
-                // Left Wall
-                const leftWall = [-4.0, cameraPos[1], cameraPos[2]];
-                if (window.collider.AABBCollider(cameraPos, leftWall, wallRadius) || cameraPos[0] < -4.0) {
-                    cameraPos[0] = -4.0 + wallRadius;
-                }
-
-                // Right Wall
-                const rightWall = [4.0, cameraPos[1], cameraPos[2]];
-                if (window.collider.AABBCollider(cameraPos, rightWall, wallRadius) || cameraPos[0] > 4.0) {
-                    cameraPos[0] = 4.0 - wallRadius;
-                }
-
-                // Bottom Wall (Y = -2.0)
-                const bottomWall = [cameraPos[0], -2.0, cameraPos[2]];
-                if (window.collider.AABBCollider(cameraPos, bottomWall, wallRadius) || cameraPos[1] < -2.0) {
-                    cameraPos[1] = -2.0 + wallRadius;
-                }
-
-                // Top Wall (Y = 2.0)
-                const topWall = [cameraPos[0], 2.0, cameraPos[2]];
-                if (window.collider.AABBCollider(cameraPos, topWall, wallRadius) || cameraPos[1] > 2.0) {
-                    cameraPos[1] = 2.0 - wallRadius;
+                // Floor collision — don't let camera go below the grass
+                const floorZ = grassZ + 0.2; // small margin above the grass surface
+                if (cameraPos[2] < floorZ) {
+                    cameraPos[2] = floorZ;
                 }
 
                 // restore the same camera tilt/look
@@ -1192,6 +1207,12 @@
 
                 setMaterialColor(0.0, 0.0, 0.0); // black divider
                 divider.render();
+                
+                setMaterialColor(0.35, 0.35, 0.35); // rock gray
+
+                for (let r of rocks) {
+                    r.render();
+                }
 
                 // Light marker cube
                 setMaterialColor(1.0, 1.0, 1.0);
