@@ -380,13 +380,13 @@
             let cameraUp = [0, -1, 0];
 
             const cameraA = {
-                position: [0, 2.2, 1.7],
-                target: [0, 0.1, -0.15]
+                position: [0, 1.85, 1.45],
+                target: [0, 0.05, -0.15]
             };
 
             const cameraB = {
-                position: [0, -2.2, 1.7], // [0, -2.2, 1.7]
-                target: [0, 0.1, -0.15]
+                position: [0, -1.85, 1.45],
+                target: [0, 0.05, -0.15]
             };
 
             let cameraPos = [...cameraA.position];
@@ -922,11 +922,42 @@
                         cameraPos[1] -= moveSpeed;
                     }
                 }
+                
+                if (!window.collider) window.collider = new CollisionDetection();
+                
+                const virtualFloorObj = [cameraPos[0], cameraPos[1], grassZ];
+                const cameraRadius = 0.2; // How close the camera can get to the floor
 
-                // Floor collision — don't let camera go below the grass
-                const floorZ = grassZ + 0.2; // small margin above the grass surface
-                if (cameraPos[2] < floorZ) {
-                    cameraPos[2] = floorZ;
+                // AABB check between camera and floor
+                if (window.collider.AABBCollider(cameraPos, virtualFloorObj, cameraRadius) || cameraPos[2] < grassZ) {
+                    cameraPos[2] = grassZ + cameraRadius;
+                }
+
+                // Wall collisions - keep camera inside the grass boundaries
+                const wallRadius = 0.2;
+
+                // Left Wall
+                const leftWall = [-4.0, cameraPos[1], cameraPos[2]];
+                if (window.collider.AABBCollider(cameraPos, leftWall, wallRadius) || cameraPos[0] < -4.0) {
+                    cameraPos[0] = -4.0 + wallRadius;
+                }
+
+                // Right Wall
+                const rightWall = [4.0, cameraPos[1], cameraPos[2]];
+                if (window.collider.AABBCollider(cameraPos, rightWall, wallRadius) || cameraPos[0] > 4.0) {
+                    cameraPos[0] = 4.0 - wallRadius;
+                }
+
+                // Bottom Wall (Y = -2.0)
+                const bottomWall = [cameraPos[0], -2.0, cameraPos[2]];
+                if (window.collider.AABBCollider(cameraPos, bottomWall, wallRadius) || cameraPos[1] < -2.0) {
+                    cameraPos[1] = -2.0 + wallRadius;
+                }
+
+                // Top Wall (Y = 2.0)
+                const topWall = [cameraPos[0], 2.0, cameraPos[2]];
+                if (window.collider.AABBCollider(cameraPos, topWall, wallRadius) || cameraPos[1] > 2.0) {
+                    cameraPos[1] = 2.0 - wallRadius;
                 }
 
                 // restore the same camera tilt/look
