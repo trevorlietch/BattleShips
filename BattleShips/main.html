@@ -581,6 +581,105 @@
             // Boats are made from the vertices and indices in ships.js.
             const { Boat1, Boat2, Boat3, Boat4 } = createShipModels();
 
+            function makeColorArray(vertexCount, color) {
+                const colors = [];
+                for (let i = 0; i < vertexCount; i++) {
+                    colors.push(color[0], color[1], color[2]);
+                }
+                return colors;
+            }
+
+            function createClassicCannon() {
+                const baseVertices = [
+                    -0.15, -0.08, 0.00,
+                     0.15, -0.08, 0.00,
+                     0.15,  0.08, 0.00,
+                    -0.15,  0.08, 0.00,
+                    -0.15, -0.08, 0.06,
+                     0.15, -0.08, 0.06,
+                     0.15,  0.08, 0.06,
+                    -0.15,  0.08, 0.06
+                ];
+
+                const barrelVertices = [
+                    -0.08, -0.02, 0.06,
+                     0.35, -0.02, 0.06,
+                     0.35,  0.02, 0.06,
+                    -0.08,  0.02, 0.06,
+                    -0.08, -0.02, 0.09,
+                     0.35, -0.02, 0.09,
+                     0.35,  0.02, 0.09,
+                    -0.08,  0.02, 0.09
+                ];
+
+                const indices = [
+                    0,1,2, 0,2,3,
+                    4,5,6, 4,6,7,
+                    0,1,5, 0,5,4,
+                    1,2,6, 1,6,5,
+                    2,3,7, 2,7,6,
+                    3,0,4, 3,4,7
+                ];
+
+                const baseTextureCoordinates = [
+                    0.0, 0.0,
+                    0.0, 2.0,
+                    1.0, 2.0,
+                    1.0, 0.0,
+                    0.0, 0.0,
+                    0.0, 2.0,
+                    1.0, 2.0,
+                    1.0, 0.0
+                ];
+
+                const baseColorTexture = CreateImageTexture("textures/wood_shutter_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+                const baseNormalTexture = CreateImageTexture("textures/wood_shutter_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+                const base = new Shape(baseVertices, indices, baseTextureCoordinates, baseColorTexture, baseNormalTexture);
+                base.bumpStrength = 0.8;
+                const barrelColorTexture = CreateImageTexture("textures/rusty_metal_sheet_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+                const barrelNormalTexture = CreateImageTexture("textures/rusty_metal_sheet_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+                const barrel = new Shape(barrelVertices, indices, null, barrelColorTexture, barrelNormalTexture);
+                barrel.bumpStrength = 1.0;
+
+                return {
+                    base,
+                    barrel,
+                    position: [0.0, 0.0, 0.0],
+                    rotation: [0.0, 0.0, 0.0],
+                    size: [1.0, 1.0, 1.0],
+                    render() {
+                        this.base.position = this.position;
+                        this.base.rotation = this.rotation;
+                        this.base.size = this.size;
+                        this.barrel.position = this.position;
+                        this.barrel.rotation = this.rotation;
+                        this.barrel.size = this.size;
+                        this.base.render();
+                        this.barrel.render();
+                    }
+                };
+            }
+
+            const cannonSW = createClassicCannon();
+            cannonSW.position = [-0.75, -0.75, -0.05];
+            cannonSW.rotation = [0.0, 0.0, Math.PI / 4];
+            cannonSW.size = [1.0, 1.0, 1.0];
+
+            const cannonSE = createClassicCannon();
+            cannonSE.position = [0.75, -0.75, -0.05];
+            cannonSE.rotation = [0.0, 0.0, 3 * Math.PI / 4];
+            cannonSE.size = [1.0, 1.0, 1.0];
+
+            const cannonNW = createClassicCannon();
+            cannonNW.position = [-0.75, 0.75, -0.05];
+            cannonNW.rotation = [0.0, 0.0, -Math.PI / 4];
+            cannonNW.size = [1.0, 1.0, 1.0];
+
+            const cannonNE = createClassicCannon();
+            cannonNE.position = [0.75, 0.75, -0.05];
+            cannonNE.rotation = [0.0, 0.0, -3 * Math.PI / 4];
+            cannonNE.size = [1.0, 1.0, 1.0];
+
             // Game state variables
             // Phases: "setup_a", "setup_b", "transition", "attack", "game_over"
             let gamePhase = "setup_a";
@@ -1190,20 +1289,25 @@
                 divider.size[1] = flipY;
 
                 // Render Scene - set material color before each group
-                setMaterialColor(1.0, 1.0, 1.0); // green grass
+                setMaterialColor(0.2, 0.7, 0.2); // green grass
                 grassLeft.render();
                 grassRight.render();
                 grassTop.render();
                 grassBottom.render();
 
-                // setMaterialColor(0.9, 0.8, 0.5); // sand
-                setMaterialColor(1.0, 1.0, 1.0); // sand
+                setMaterialColor(0.9, 0.8, 0.5); // sand
                 sandLeft.render();
                 sandRight.render();
                 sandTop.render();
                 sandBottom.render();
 
                 Water.render();
+
+                setMaterialColor(1.0, 1.0, 1.0); // neutral for textured cannons
+                cannonSW.render();
+                cannonSE.render();
+                cannonNW.render();
+                cannonNE.render();
 
                 setMaterialColor(0.0, 0.0, 0.0); // black divider
                 divider.render();

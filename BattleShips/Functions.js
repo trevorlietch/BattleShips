@@ -626,17 +626,22 @@ function CreateImageTexture(_source, _wrap, _minFilter, _magFilter, _placeholder
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, placeholder);
 	var image = new Image(); 
 	image.onload = function(){ // Upload the image once it finishes loading
-		gl.bindTexture(gl.TEXTURE_2D, texture); // Rebind the texture before upload
-		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // WebGL images load top-down, so flip them for standard UVs
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image); // Copy the image into GPU memory
-		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // Reset global unpack state so other uploads are unaffected
-		if (UsesMipmaps(_minFilter))
-			gl.generateMipmap(gl.TEXTURE_2D); // Build mipmaps only when the chosen filter needs them
+		try {
+			gl.bindTexture(gl.TEXTURE_2D, texture); // Rebind the texture before upload
+			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // WebGL images load top-down, so flip them for standard UVs
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image); // Copy the image into GPU memory
+			if (UsesMipmaps(_minFilter))
+				gl.generateMipmap(gl.TEXTURE_2D); // Build mipmaps only when the chosen filter needs them
+		} catch (error) {
+			console.error("Could not upload image texture to WebGL:", _source, error);
+		} finally {
+			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // Reset global unpack state so other uploads are unaffected
+		}
 	}; 
 	image.onerror = function() {
 		console.error("Failed to load image texture:", _source);
 	};
-	image.src = _source; // Start loading the requested file
+	image.src = new URL(_source, document.baseURI).href; // Start loading the requested file
 	return texture; 
 } 
 
@@ -676,15 +681,22 @@ function CreateCubeMap(_faceSources){
 
 			var image = new Image();
 			image.onload = function(){
-				gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
-				gl.texImage2D(faceInfo.target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-				loadedFaceCount++;
+				try {
+					gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+					gl.texImage2D(faceInfo.target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+					loadedFaceCount++;
 
-				if (loadedFaceCount === faceTargetInfo.length && UsesMipmaps(gl.LINEAR)) {
-					gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+					if (loadedFaceCount === faceTargetInfo.length && UsesMipmaps(gl.LINEAR)) {
+						gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+					}
+				} catch (error) {
+					console.error("Could not upload cubemap texture to WebGL:", faceInfo.source, error);
 				}
 			};
-			image.src = faceInfo.source;
+			image.onerror = function() {
+				console.error("Failed to load cubemap texture:", faceInfo.source);
+			};
+			image.src = new URL(faceInfo.source, document.baseURI).href;
 		})(faceTargetInfo[i]);
 	}
 
