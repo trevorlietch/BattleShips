@@ -10,7 +10,7 @@
     <script src="ships.js"></script>
     <body>
         <div id="game-wrapper" style="position:relative; display:inline-block;">
-            <div id="hud" style="position:absolute; top:10px; left:10px; color:#fff; font-family:monospace; font-size:14px; background:rgba(0,0,0,1.00); padding:6px 12px; border-radius:4px; z-index:10; pointer-events:none;">
+            <div id="hud" style="position:absolute; top:10px; left:10px; color:#fff; font-family:monospace; font-size:14px; background:rgba(0,0,0,0.85); padding:6px 12px; border-radius:4px; z-index:10; pointer-events:none;">
                 Player A: Place your ships
             </div>
             <div id="ship-status" style="position:absolute; top:10px; right:10px; color:#fff; font-family:monospace; font-size:12px; background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:4px; z-index:10; pointer-events:none; display:none;"></div>
@@ -18,7 +18,7 @@
                 <div style="color:#fff; font-family:monospace; font-size:28px; text-align:center;" id="transition-text">Pass device to the other player</div>
                 <div style="color:#aaa; font-family:monospace; font-size:16px; margin-top:16px; text-align:center;">Click anywhere to continue</div>
             </div>
-            <div id="gameover-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,1.00); z-index:30; justify-content:center; align-items:center;">
+            <div id="gameover-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:30; justify-content:center; align-items:center;">
                 <div style="color:#fff; font-family:monospace; font-size:36px; text-align:center;" id="gameover-text">Game Over!</div>
             </div>
             <canvas id="example" tabindex="0" width="1000" height="700" style="border:5px solid black;"></canvas>
@@ -247,72 +247,6 @@
                 }                                                    
             
             </script>
-        <!-- <script>
-            // Shape class that stores vertex + color data in separate buffers and renders it using WebGL
-            // ONE VAO per shape (mesh). The VAO remembers attribute layout + buffer bindings.
-            class Shape {
-                constructor(vertices, colors, indices, mode = gl.TRIANGLES) {
-                    this.vertices = vertices;
-                    this.indices = indices;
-                    this.mode = mode;
-
-                    this.colors = colors;
-                    this.size = [1.0, 1.0, 1.0];
-                    this.position = [0.0, 0.0, 0.0];
-                    this.rotY = 0.0;
-                    this.rotX = 0.0;
-                    this.rotZ = 0.0;
-
-                    this.vao = setVAO();
-
-                    bindVAO(this.vao);
-
-                    // create buffers once
-                    this.vertexBuffer = gl.createBuffer();
-                    gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
-
-                    let coordLoc = gl.getAttribLocation(myWebGL.program, "coordinates");
-                    gl.enableVertexAttribArray(coordLoc);
-                    gl.vertexAttribPointer(coordLoc, 3, gl.FLOAT, false, 0, 0);
-
-                    this.colorBuffer = gl.createBuffer();
-                    gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
-                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.colors), gl.DYNAMIC_DRAW);
-
-                    let colorLoc = gl.getAttribLocation(myWebGL.program, "color");
-                    gl.enableVertexAttribArray(colorLoc);
-                    gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
-
-                    this.indexBuffer = gl.createBuffer();
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-                    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indices), gl.STATIC_DRAW);
-
-                    unbindVAO();
-                }
-
-                render() {
-                    Scale(myWebGL, this.size[0], this.size[1], this.size[2]);
-                    Translate(myWebGL, this.position[0], this.position[1], this.position[2]);
-
-                    RotateY(myWebGL, this.rotY);
-                    RotateX(myWebGL, this.rotX);
-                    RotateZ(myWebGL, this.rotZ);
-
-                    bindVAO(this.vao);
-
-                    // only update color buffer when rendering
-                    gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
-                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.colors), gl.DYNAMIC_DRAW);
-
-                    gl.drawElements(this.mode, this.indices.length, gl.UNSIGNED_SHORT, 0);
-
-                    unbindVAO();
-                }
-            }
-
-        </script> -->
-        
         <script>            
             // Get the canvas element from the HTML document
             var canvas = document.getElementById("example");
@@ -445,14 +379,26 @@
                 0.0, 4.0
             ];
 
-            var Water = new Shape(
+            // ReflectiveShape requires a normals array for tangent calculations
+            var waterNormals = [
+                0,0,1, 0,0,1, 0,0,1,
+                0,0,1, 0,0,1, 0,0,1
+            ];
+
+            var Water = new ReflectiveShape(
                 waterVertices,
                 waterIndices,
                 waterTextureCoordinates,
+                waterNormals,
                 CreateImageTexture("textures/water 0342.png", gl.REPEAT, gl.LINEAR, gl.LINEAR),
                 CreateImageTexture("textures/water 0342normal.jpg", gl.REPEAT, gl.LINEAR, gl.LINEAR)
             );
-            Water.bumpStrength = 1.8;
+            Water.bumpStrength = 1.0;
+            Water.blendFactor = 0.0; // 0.0 so it doesn't render pitch-black without a cubemap
+            Water.AmbientMaterial = [0.0, 0.25, 0.55, 1.0];
+            Water.DiffuseMaterial = [0.0, 0.3, 0.6, 1.0];
+            Water.SpecularMaterial = [1.0, 1.0, 1.0, 1.0];
+            Water.Shininess = 100.0;
             
             // Sand for beach
             var sandLeftVertices = [
@@ -1242,11 +1188,6 @@
                 sandTop.render();
                 sandBottom.render();
 
-                // Water gets its own high-specular material for visible reflections
-                setUniform4f(myWebGL, "ambientMat", 0.0, 0.25, 0.55, 1.0);
-                setUniform4f(myWebGL, "diffuseMat", 0.0, 0.3, 0.6, 1.0);
-                setUniform4f(myWebGL, "specularMat", 1.0, 1.0, 1.0, 1.0);
-                setUniform1f(myWebGL, "shininess", 32.0);
                 Water.render();
 
                 setMaterialColor(0.0, 0.0, 0.0); // black divider
