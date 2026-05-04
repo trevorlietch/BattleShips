@@ -340,7 +340,7 @@
             var Lights = [MainLight, WaterLight];
 
             // Small cube to mark the light position
-            var s = 0.05; // half-size
+            var s = 0.15; // half-size
             var lightMarkerVerts = [
                 // Front
                 -s,-s, s,  s,-s, s,  s, s, s,  -s,-s, s,  s, s, s,  -s, s, s,
@@ -357,7 +357,18 @@
             ];
             var lightMarkerInds = [];
             for (var i = 0; i < 36; i++) lightMarkerInds.push(i);
-            var lightMarker = new Shape(lightMarkerVerts, lightMarkerInds);
+
+            var faceTexCoords = [
+                0.0, 0.0,  1.0, 0.0,  1.0, 1.0,
+                0.0, 0.0,  1.0, 1.0,  0.0, 1.0
+            ];
+            var lightMarkerTexCoords = [];
+            for (var i = 0; i < 6; i++) {
+                lightMarkerTexCoords.push(...faceTexCoords);
+            }
+            
+            var sunColorTexture = CreateImageTexture("textures/Sun.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var lightMarker = new Shape(lightMarkerVerts, lightMarkerInds, lightMarkerTexCoords, sunColorTexture);
             lightMarker.position = [
                 WaterLight.lightPosition[0],
                 WaterLight.lightPosition[1],
@@ -1157,6 +1168,15 @@
                 Projection(myWebGL, Math.PI / 3, canvas.width / canvas.height, 0.1, 100);
                 View(myWebGL, cameraPos, cameraTarget, cameraUp);
 
+                // Make the light zip around
+                let time = performance.now() * 0.0003; // Animation speed
+                WaterLight.lightPosition[0] = Math.sin(time) * 1.5; // X motion
+                WaterLight.lightPosition[1] = Math.cos(time * 0.8) * 1.5; // Y motion
+                // Keep Z at 2.0
+                
+                // Update marker position to follow the light
+                lightMarker.position = [WaterLight.lightPosition[0], -WaterLight.lightPosition[1], WaterLight.lightPosition[2]];
+
                 // Render all lights each frame
                 for (var i = 0; i < Lights.length; i++) {
                     Lights[i].render(i, Lights.length);
@@ -1201,8 +1221,8 @@
                 setMaterialColor(0.0, 0.0, 0.0); // black divider
                 divider.render();
 
-                // Light marker cube (bright yellow so it's easy to spot)
-                setMaterialColor(1.0, 1.0, 0.0);
+                // Light marker cube
+                setMaterialColor(1.0, 1.0, 1.0);
                 lightMarker.size[1] = flipY;
                 lightMarker.render();
 
