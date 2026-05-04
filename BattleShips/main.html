@@ -497,6 +497,8 @@
 
             var sandColorTexture = CreateImageTexture("textures/worn_rock_natural_01_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
             var sandNormalTexture = CreateImageTexture("textures/worn_rock_natural_01_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var rockColorTexture = CreateImageTexture("textures/rock_08_diff_4k.png",gl.REPEAT,gl.LINEAR,gl.LINEAR
+            );
 
             var sandLeft = new Shape(sandLeftVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
             var sandRight = new Shape(sandRightVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
@@ -531,40 +533,42 @@
 
             var gridTop = createTileGrid(0.0, 0.30, 0.05, 0.0, 9);
             var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 9);
-            function createTriangleRock(x, y, z) {
-                // randomness
-                const skew = (Math.random() - 0.5) * 0.25;   // left/right lean
-                const height = 0.5 + Math.random() * 0.4;    // how tall
-                const base = 0.15 + Math.random() * 0.15;      // base size
 
-                var vertices = [
-                    skew, height, 0.0,
+            function createRock(x, y, z) {
+            const skew = (Math.random() - 0.5) * 0.25;
+            const height = 0.5 + Math.random() * 0.4;
+            const base = 0.15 + Math.random() * 0.15;
 
-                    -base, 0.0, -base,
-                    base, 0.0, -base,
-                    base, 0.0,  base,
-                    -base, 0.0,  base
-                ];
+            const top = [skew, height, 0.0];
+            const p1 = [-base, 0.0, -base];
+            const p2 = [ base, 0.0, -base];
+            const p3 = [ base, 0.0,  base];
+            const p4 = [-base, 0.0,  base];
 
-                    var indices = [
-                    0,1,2,
-                    0,2,3,
-                    0,3,4,
-                    0,4,1,
-                    1,2,3,  1,3,4
-                ];
+            const vertices = [
+                ...top, ...p1, ...p2,
+                ...top, ...p2, ...p3,
+                ...top, ...p3, ...p4,
+                ...top, ...p4, ...p1
+            ];
 
-                var rock = new Shape(vertices, indices);
-                // position
-                rock.position = [x, y, z];
+            const texCoords = [
+                0.5, 1.0,  0.0, 0.0,  1.0, 0.0,
+                0.5, 1.0,  0.0, 0.0,  1.0, 0.0,
+                0.5, 1.0,  0.0, 0.0,  1.0, 0.0,
+                0.5, 1.0,  0.0, 0.0,  1.0, 0.0
+            ];
 
-                // random scaling variation
-                let s = 1.5 + Math.random() * 0.1;
-                rock.size = [s, s, s];
+            const indices = [...Array(12).keys()];
+            const rock = new Shape(vertices, indices, texCoords, rockColorTexture);
 
-                return rock;
-            }
+            rock.position = [x, y, z];
 
+            let s = 1.5 + Math.random() * 0.1;
+            rock.size = [s, s, s];
+
+            return rock;
+        }
             var rocks = [];
 
             for (let i = 0; i < 10; i++) {
@@ -572,10 +576,10 @@
                 let z = 0.4;                        
 
                 let xRight = 1.3;                           
-                rocks.push(createTriangleRock(xRight, y, z));
+                rocks.push(createRock(xRight, y, z));
 
-                let xLeft = -1.3; 
-                rocks.push(createTriangleRock(xLeft, y, z));
+            let xLeft = -1.3; 
+            rocks.push(createRock(xLeft, y, z));
             }
 
             // Boats are made from the vertices and indices in ships.js.
@@ -1312,7 +1316,7 @@
                 setMaterialColor(0.0, 0.0, 0.0); // black divider
                 divider.render();
                 
-                setMaterialColor(0.35, 0.35, 0.35); // rock gray
+                setMaterialColor(1.0, 1.0, 1.0);
 
                 for (let r of rocks) {
                     r.render();
