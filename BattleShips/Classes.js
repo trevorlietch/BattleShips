@@ -212,6 +212,7 @@ class Shape
                     setUniform1i(myWebGL, "uUseSkybox", 0); //Disable skybox
                     setUniform1i(myWebGL, "uUseReflectionMap", 0); //Disable reflection map
                     setUniform1i(myWebGL, "uUseBlendMap", 0); //Disable blend map
+                    setUniform1i(myWebGL, "uUseVertexColor", 0); //Disable vertex colors
                     setUniform1f(myWebGL, "uBumpStrength", 0.0); //Disable bump mapping for plain shapes
                     setUniform1f(myWebGL, "uBlendFactor", 0.0); //blend factor set to 0
                     gl.drawElements(this.drawMode, this.indices.length, gl.UNSIGNED_SHORT, 0);//draw shape
@@ -265,6 +266,7 @@ class Skybox
                     setUniform1i(myWebGL, "uUseSkybox", 1); // Enable skybox
                     setUniform1i(myWebGL, "uUseReflectionMap", 0); // Disable reflection map
                     setUniform1i(myWebGL, "uUseBlendMap", 0); // Disable blend map
+                    setUniform1i(myWebGL, "uUseVertexColor", 0); // Disable vertex colors
                     setUniform1f(myWebGL, "uBlendFactor", 0.0); // Blend factor
                     gl.drawElements(gl.TRIANGLES, this.indices.length, gl.UNSIGNED_SHORT, 0); // Draw skybox
                     setUniform1i(myWebGL, "uUseSkybox", 0); // Disable skybox
@@ -339,6 +341,7 @@ class ReflectiveShape
                     setUniform1i(myWebGL, "uCubeMap", 1); // Cubemap sampler unit - This value needs to match the Texture unit in TEXTURE1
                     setUniform1i(myWebGL, "uNormalMap", 2); // Normal-map sampler unit - This value needs to match the Texture unit in TEXTURE2
                     setUniform1i(myWebGL, "uUseSkybox", 0); // Disable skybox
+                    setUniform1i(myWebGL, "uUseVertexColor", 0); // Disable vertex colors
                     setUniform1f(myWebGL, "uBumpStrength", this.bumpStrength); // Send the bump intensity to the shader
                     setUniform1f(myWebGL, "uBlendFactor", this.blendFactor); // Blend factor
 
@@ -379,6 +382,7 @@ class ReflectiveShape
 
                     // Store vertex colors array (r, g, b per vertex)
                     this.colors = colors;
+                    this.baseColors = [...colors];
                     this.indices = indices;
                     this.size = [1.0, 1.0, 1.0];
                     this.position = [0.0, 0.0, 0];
@@ -391,24 +395,30 @@ class ReflectiveShape
                     this.vertexBuffer = SetBufferAndAttribute(myWebGL, "coordinates",this.vertices, 3, 0, 0);
                     this.colorBuffer = SetBufferAndAttribute(myWebGL, "color",this.colors, 3, 0, 0);
                     SetIndexBuffer(this.indices);
+                    unbindVAO();
+                }
+
+                setColors(colors)
+                {
+                    if (this.colors.length === colors.length && this.colors.every((value, i) => value === colors[i])) {
+                        return;
+                    }
+
+                    this.colors = [...colors];
+                    bindVAO(this.vao);
+                    SetBufferData(this.colors,this.colorBuffer);
+                    unbindVAO();
                 }
 
                 setSolidColor(color)
                 {
-                    if (this.colors[0] === color[0] && this.colors[1] === color[1] && this.colors[2] === color[2]) {
-                        return;
-                    }
-
                     var updatedColors = [];
 
                     for (var i = 0; i < this.colors.length; i += 3) {
                         updatedColors.push(color[0], color[1], color[2]);
                     }
 
-                    this.colors = updatedColors;
-                    bindVAO(this.vao);
-                    SetBufferData(this.colors,this.colorBuffer);
-                    unbindVAO();
+                    this.setColors(updatedColors);
                 }
 
                 render()
@@ -424,8 +434,10 @@ class ReflectiveShape
                     setUniform1i(myWebGL, "uUseSkybox", 0);
                     setUniform1i(myWebGL, "uUseReflectionMap", 0);
                     setUniform1i(myWebGL, "uUseBlendMap", 0);
+                    setUniform1i(myWebGL, "uUseVertexColor", 1);
                     setUniform1f(myWebGL, "uBlendFactor", 0.0);
                     gl.drawElements(gl.TRIANGLES, this.indices.length, gl.UNSIGNED_SHORT, 0);
+                    setUniform1i(myWebGL, "uUseVertexColor", 0);
 
                     unbindVAO();
                 }
