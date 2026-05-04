@@ -497,8 +497,8 @@
 
             var sandColorTexture = CreateImageTexture("textures/worn_rock_natural_01_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
             var sandNormalTexture = CreateImageTexture("textures/worn_rock_natural_01_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
-            var rockColorTexture = CreateImageTexture("textures/rock_08_diff_4k.png",gl.REPEAT,gl.LINEAR,gl.LINEAR
-            );
+            var rockColorTexture = CreateImageTexture("textures/rock_08_diff_4k.png",gl.REPEAT,gl.LINEAR,gl.LINEAR);
+            var rockNormalTexture = CreateImageTexture("textures/rock_08_nor_gl_4k.png",gl.REPEAT,gl.LINEAR,gl.LINEAR);
 
             var sandLeft = new Shape(sandLeftVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
             var sandRight = new Shape(sandRightVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
@@ -560,7 +560,8 @@
             ];
 
             const indices = [...Array(12).keys()];
-            const rock = new Shape(vertices, indices, texCoords, rockColorTexture);
+            const rock = new Shape(vertices, indices, texCoords, rockColorTexture, rockNormalTexture);
+            rock.bumpStrength = 1.4;
 
             rock.position = [x, y, z];
 
@@ -1070,11 +1071,43 @@
                     }
                 }
 
-                // Floor collision — don't let camera go below the grass
-                const floorZ = grassZ + 0.2; // small margin above the grass surface
-                if (cameraPos[2] < floorZ) {
-                    cameraPos[2] = floorZ;
+                if (!window.collider) window.collider = new CollisionDetection();
+                
+                const virtualFloorObj = [cameraPos[0], cameraPos[1], grassZ];
+                const cameraRadius = 0.2; // How close the camera can get to the floor
+
+                // AABB check between camera and floor
+                if (window.collider.AABBCollider(cameraPos, virtualFloorObj, cameraRadius) || cameraPos[2] < grassZ) {
+                    cameraPos[2] = grassZ + cameraRadius;
                 }
+
+                // Wall collisions - keep camera inside the grass boundaries
+                const wallRadius = 0.2;
+
+                // Left Wall
+                const leftWall = [-1.0, cameraPos[1], cameraPos[2]];
+                if (window.collider.AABBCollider(cameraPos, leftWall, wallRadius) || cameraPos[0] < -4.0) {
+                    cameraPos[0] = -1.0 + wallRadius;
+                }
+
+                // Right Wall
+                const rightWall = [1.0, cameraPos[1], cameraPos[2]];
+                if (window.collider.AABBCollider(cameraPos, rightWall, wallRadius) || cameraPos[0] > 4.0) {
+                    cameraPos[0] = 1.0 - wallRadius;
+                }
+
+                // Bottom Wall (Y = -2.0)
+                const bottomWall = [cameraPos[0], -2.0, cameraPos[2]];
+                if (window.collider.AABBCollider(cameraPos, bottomWall, wallRadius) || cameraPos[1] < -2.0) {
+                    cameraPos[1] = -2.0 + wallRadius;
+                }
+
+                // Top Wall (Y = 2.0)
+                const topWall = [cameraPos[0], 2.0, cameraPos[2]];
+                if (window.collider.AABBCollider(cameraPos, topWall, wallRadius) || cameraPos[1] > 2.0) {
+                    cameraPos[1] = 2.0 - wallRadius;
+                }
+
 
                 // restore the same camera tilt/look
                 cameraTarget = [
@@ -1293,13 +1326,13 @@
                 divider.size[1] = flipY;
 
                 // Render Scene - set material color before each group
-                setMaterialColor(0.2, 0.7, 0.2); // green grass
+                setMaterialColor(1.0, 1.0, 1.0); // green grass
                 grassLeft.render();
                 grassRight.render();
                 grassTop.render();
                 grassBottom.render();
 
-                setMaterialColor(0.9, 0.8, 0.5); // sand
+                setMaterialColor(1.0,1.0,1.0); // sand
                 sandLeft.render();
                 sandRight.render();
                 sandTop.render();
