@@ -109,7 +109,7 @@ class CollisionDetection{
  
 class Shape
             {
-                constructor(vertices, indices = null, textureCoords = null)
+constructor(vertices, indices = null, textureCoords = null, texture = null, normalTexture = null)
                 {
                     // Store vertex positions array (x, y, z per vertex)
                     this.vertices = vertices;
@@ -139,9 +139,10 @@ class Shape
                     SetIndexBuffer(this.indices);
 
                     // Solid white 1x1 texture so material colors show through unaltered
-                    this.texture = CreateEmptyTexture(gl.CLAMP_TO_EDGE, gl.LINEAR, gl.LINEAR, gl.RGBA, 1, 1, new Uint8Array([255, 255, 255, 255]));
+                    this.texture = texture || CreateEmptyTexture(gl.CLAMP_TO_EDGE, gl.LINEAR, gl.LINEAR, gl.RGBA, 1, 1, new Uint8Array([255, 255, 255, 255]));
+                    this.normalTexture = normalTexture || CreateEmptyTexture(gl.CLAMP_TO_EDGE, gl.LINEAR, gl.LINEAR, gl.RGBA, 1, 1, new Uint8Array([128, 128, 255, 255]));
+                    this.bumpStrength = 0.0;
 
-		            
                     unbindVAO();
                 }
 
@@ -204,7 +205,7 @@ class Shape
                     // Bind THIS shape's VAO and draw
                     bindVAO(this.vao);
                     ActivateTexture(gl.TEXTURE0, gl.TEXTURE_2D, this.texture); //Bind 2D Texture
-                    ActivateTexture(gl.TEXTURE2, gl.TEXTURE_2D, this.texture); //Bind 2D Texture to Normal Map unit (white texture = flat normal)
+                    ActivateTexture(gl.TEXTURE2, gl.TEXTURE_2D, this.normalTexture); //Bind normal map texture
 
                     setUniform1i(myWebGL, "uTexture", 0); //2D texture sampler unit
                     setUniform1i(myWebGL, "uCubeMap", 1); //Cubemap sampler unit (must differ from sampler2D units)
@@ -213,7 +214,7 @@ class Shape
                     setUniform1i(myWebGL, "uUseReflectionMap", 0); //Disable reflection map
                     setUniform1i(myWebGL, "uUseBlendMap", 0); //Disable blend map
                     setUniform1i(myWebGL, "uUseVertexColor", 0); //Disable vertex colors
-                    setUniform1f(myWebGL, "uBumpStrength", 0.0); //Disable bump mapping for plain shapes
+                    setUniform1f(myWebGL, "uBumpStrength", this.bumpStrength); //Set bump strength for this shape
                     setUniform1f(myWebGL, "uBlendFactor", 0.0); //blend factor set to 0
                     gl.drawElements(this.drawMode, this.indices.length, gl.UNSIGNED_SHORT, 0);//draw shape
 

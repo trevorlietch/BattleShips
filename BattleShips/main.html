@@ -340,7 +340,7 @@
             var Lights = [MainLight, WaterLight];
 
             // Small cube to mark the light position
-            var s = 0.05; // half-size
+            var s = 0.15; // half-size
             var lightMarkerVerts = [
                 // Front
                 -s,-s, s,  s,-s, s,  s, s, s,  -s,-s, s,  s, s, s,  -s, s, s,
@@ -357,7 +357,18 @@
             ];
             var lightMarkerInds = [];
             for (var i = 0; i < 36; i++) lightMarkerInds.push(i);
-            var lightMarker = new Shape(lightMarkerVerts, lightMarkerInds);
+
+            var faceTexCoords = [
+                0.0, 0.0,  1.0, 0.0,  1.0, 1.0,
+                0.0, 0.0,  1.0, 1.0,  0.0, 1.0
+            ];
+            var lightMarkerTexCoords = [];
+            for (var i = 0; i < 6; i++) {
+                lightMarkerTexCoords.push(...faceTexCoords);
+            }
+            
+            var sunColorTexture = CreateImageTexture("textures/Sun.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var lightMarker = new Shape(lightMarkerVerts, lightMarkerInds, lightMarkerTexCoords, sunColorTexture);
             lightMarker.position = [
                 WaterLight.lightPosition[0],
                 WaterLight.lightPosition[1],
@@ -424,7 +435,24 @@
 
             var waterIndices = [0,1,2, 3,4,5];
 
-            var Water = new Shape(waterVertices, waterIndices);
+            var waterTextureCoordinates = [
+                0.0, 0.0,
+                4.0, 0.0,
+                4.0, 4.0,
+
+                0.0, 0.0,
+                4.0, 4.0,
+                0.0, 4.0
+            ];
+
+            var Water = new Shape(
+                waterVertices,
+                waterIndices,
+                waterTextureCoordinates,
+                CreateImageTexture("textures/water 0342.png", gl.REPEAT, gl.LINEAR, gl.LINEAR),
+                CreateImageTexture("textures/water 0342normal.jpg", gl.REPEAT, gl.LINEAR, gl.LINEAR)
+            );
+            Water.bumpStrength = 1.8;
             
             // Sand for beach
             var sandLeftVertices = [
@@ -521,15 +549,39 @@
             var divider = new Shape(dividerVertices, dividerIndices);
             divider.drawMode = gl.LINES;
 
-            var sandLeft = new Shape(sandLeftVertices, waterIndices);
-            var sandRight = new Shape(sandRightVertices, waterIndices);
-            var sandTop = new Shape(sandTopVertices, waterIndices);
-            var sandBottom = new Shape(sandBottomVertices, waterIndices);
+            var sandColorTexture = CreateImageTexture("textures/worn_rock_natural_01_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var sandNormalTexture = CreateImageTexture("textures/worn_rock_natural_01_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
 
-            var grassLeft = new Shape(grassLeftVertices, waterIndices);
-            var grassRight = new Shape(grassRightVertices, waterIndices);
-            var grassTop = new Shape(grassTopVertices, waterIndices);
-            var grassBottom = new Shape(grassBottomVertices, waterIndices);
+            var sandLeft = new Shape(sandLeftVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
+            var sandRight = new Shape(sandRightVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
+            var sandTop = new Shape(sandTopVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
+            var sandBottom = new Shape(sandBottomVertices, waterIndices, null, sandColorTexture, sandNormalTexture);
+            sandLeft.bumpStrength = 2.0;
+            sandRight.bumpStrength = 2.0;
+            sandTop.bumpStrength = 2.0;
+            sandBottom.bumpStrength = 2.0;
+            
+
+            var grassColorTexture = CreateImageTexture("textures/brown_mud_leaves_01_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var grassNormalTexture = CreateImageTexture("textures/brown_mud_leaves_01_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
+            var grassTextureCoordinates = [
+                0.0, 0.0,
+                4.0, 0.0,
+                4.0, 4.0,
+
+                0.0, 0.0,
+                4.0, 4.0,
+                0.0, 4.0
+            ];
+
+            var grassLeft = new Shape(grassLeftVertices, waterIndices, grassTextureCoordinates, grassColorTexture, grassNormalTexture);
+            var grassRight = new Shape(grassRightVertices, waterIndices, grassTextureCoordinates, grassColorTexture, grassNormalTexture);
+            var grassTop = new Shape(grassTopVertices, waterIndices, grassTextureCoordinates, grassColorTexture, grassNormalTexture);
+            var grassBottom = new Shape(grassBottomVertices, waterIndices, grassTextureCoordinates, grassColorTexture, grassNormalTexture);
+            grassLeft.bumpStrength = 1.4;
+            grassRight.bumpStrength = 1.4;
+            grassTop.bumpStrength = 1.4;
+            grassBottom.bumpStrength = 1.4;
 
             var gridTop = createTileGrid(0.0, 0.30, 0.05, 0.0, 9);
             var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 9);
@@ -1147,6 +1199,15 @@
                 Projection(myWebGL, Math.PI / 3, canvas.width / canvas.height, 0.1, 100);
                 View(myWebGL, cameraPos, cameraTarget, cameraUp);
 
+                // Make the light zip around
+                let time = performance.now() * 0.0003; // Animation speed
+                WaterLight.lightPosition[0] = Math.sin(time) * 1.5; // X motion
+                WaterLight.lightPosition[1] = Math.cos(time * 0.8) * 1.5; // Y motion
+                // Keep Z at 2.0
+                
+                // Update marker position to follow the light
+                lightMarker.position = [WaterLight.lightPosition[0], -WaterLight.lightPosition[1], WaterLight.lightPosition[2]];
+
                 // Render all lights each frame
                 for (var i = 0; i < Lights.length; i++) {
                     Lights[i].render(i, Lights.length);
@@ -1168,13 +1229,14 @@
                 divider.size[1] = flipY;
 
                 // Render Scene - set material color before each group
-                setMaterialColor(0.2, 0.7, 0.2); // green grass
+                setMaterialColor(1.0, 1.0, 1.0); // green grass
                 grassLeft.render();
                 grassRight.render();
                 grassTop.render();
                 grassBottom.render();
 
-                setMaterialColor(0.9, 0.8, 0.5); // sand
+                // setMaterialColor(0.9, 0.8, 0.5); // sand
+                setMaterialColor(1.0, 1.0, 1.0); // sand
                 sandLeft.render();
                 sandRight.render();
                 sandTop.render();
@@ -1190,8 +1252,8 @@
                 setMaterialColor(0.0, 0.0, 0.0); // black divider
                 divider.render();
 
-                // Light marker cube (bright yellow so it's easy to spot)
-                setMaterialColor(1.0, 1.0, 0.0);
+                // Light marker cube
+                setMaterialColor(1.0, 1.0, 1.0);
                 lightMarker.size[1] = flipY;
                 lightMarker.render();
 
