@@ -1128,9 +1128,9 @@
                 }
 
                 // Ceilings
-                const ceilObj = [cameraPos[0], cameraPos[1], 2.0];
-                if (window.collider.AABBCollider(cameraPos, ceilObj, cameraRadius) || cameraPos[2] > 2.0) {
-                    cameraPos[2] = 2.0 - cameraRadius;
+                const ceilObj = [cameraPos[0], cameraPos[1], 4.0];
+                if (window.collider.AABBCollider(cameraPos, ceilObj, cameraRadius) || cameraPos[2] > 4.0) {
+                    cameraPos[2] = 4.0 - cameraRadius;
                 }
 
                 // Wall collisions - keep camera inside the grass boundaries
