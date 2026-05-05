@@ -257,16 +257,17 @@
             // Event listener for mouse clicks
             canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-            // Lighting setup (Phong shader requires at least one light)
+            // Lighting setup
+            // main light does most of the lighting for the whole scene
             var MainLight = new Light();
-            MainLight.lightPosition = [0.0, -0.5, 1.0, 0.0]; // directional light from above and behind
+            MainLight.lightPosition = [0.0, -0.5, 1.0, 0.0];
             MainLight.lightAmbient = [0.2, 0.2, 0.2, 1.0];
             MainLight.lightDiffuse = [0.5, 0.5, 0.5, 1.0];
             MainLight.lightSpecular = [0.6, 0.6, 0.6, 1.0];
 
-            // Second light near the water for a visible specular highlight
+            // second light above water (the sun) that does some reflection and moves around
             var WaterLight = new Light();
-            WaterLight.lightPosition = [0.0, 0.0, 2.0, 1.0]; // point light high above the water
+            WaterLight.lightPosition = [0.0, 0.0, 2.0, 1.0];
             WaterLight.lightAmbient = [0.0, 0.0, 0.0, 1.0];
             WaterLight.lightDiffuse = [0.1, 0.15, 0.2, 1.0];
             WaterLight.lightSpecular = [0.5, 0.5, 0.5, 1.0];
@@ -274,7 +275,7 @@
             var Lights = [MainLight, WaterLight];
 
             // Small cube to mark the light position
-            var s = 0.15; // half-size
+            var s = 0.15;
             var lightMarkerVerts = [
                 // Front
                 -s,-s, s,  s,-s, s,  s, s, s,  -s,-s, s,  s, s, s,  -s, s, s,
@@ -309,7 +310,7 @@
                 WaterLight.lightPosition[2]
             ];
 
-            // Helper: set material color before rendering a shape
+            // helper to set material color before rendering a shape
             function setMaterialColor(r, g, b) {
                 setUniform4f(myWebGL, "ambientMat", r, g, b, 1.0);
                 setUniform4f(myWebGL, "diffuseMat", r, g, b, 1.0);
@@ -317,18 +318,17 @@
                 setUniform1f(myWebGL, "shininess", 1.0);
             }
 
-
-
-
             // Camera 
             let moveSpeed = 0.02;
             let cameraUp = [0, -1, 0];
 
+            // position and target for player a
             const cameraA = {
                 position: [0, 1.85, 1.45],
                 target: [0, 0.05, -0.15]
             };
 
+            // position and target for player b
             const cameraB = {
                 position: [0, -1.85, 1.45],
                 target: [0, 0.05, -0.15]
@@ -379,7 +379,6 @@
                 0.0, 4.0
             ];
 
-            // ReflectiveShape requires a normals array for tangent calculations
             var waterNormals = [
                 0,0,1, 0,0,1, 0,0,1,
                 0,0,1, 0,0,1, 0,0,1
@@ -534,19 +533,20 @@
             var gridTop = createTileGrid(0.0, 0.30, 0.05, 0.0, 9);
             var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 9);
 
+            // function to create a randomized rock
             function createRock(x, y, z) {
                 
                 const height = 0.25 + Math.random() * 0.2;
                 const base = 0.25 + Math.random() * 0.15;
                 const top_base = base * (0.4 + Math.random() * 0.4); 
 
-                // Randomize each corner's base coordinates to break the square shape
+                // random base coords
                 const p1 = [-base + (Math.random()-0.5)*0.1, -base + (Math.random()-0.5)*0.1, 0.0];
                 const p2 = [ base + (Math.random()-0.5)*0.1, -base + (Math.random()-0.5)*0.1, 0.0];
                 const p3 = [ base + (Math.random()-0.5)*0.1,  base + (Math.random()-0.5)*0.1, 0.0];
                 const p4 = [-base + (Math.random()-0.5)*0.1,  base + (Math.random()-0.5)*0.1, 0.0];
 
-                // Randomize each top corner's height and X/Y position so it looks kinda uneven
+                // random top coords
                 const t1 = [-top_base + (Math.random()-0.5)*0.1, -top_base + (Math.random()-0.5)*0.1, height + (Math.random()-0.5)*0.2];
                 const t2 = [ top_base + (Math.random()-0.5)*0.1, -top_base + (Math.random()-0.5)*0.1, height + (Math.random()-0.5)*0.2];
                 const t3 = [ top_base + (Math.random()-0.5)*0.1,  top_base + (Math.random()-0.5)*0.1, height + (Math.random()-0.5)*0.2];
@@ -579,16 +579,16 @@
                 ];
 
                 const indices = [...Array(30).keys()];
-            const rock = new Shape(vertices, indices, texCoords, rockColorTexture, rockNormalTexture);
-            rock.bumpStrength = 1.4;
+                const rock = new Shape(vertices, indices, texCoords, rockColorTexture, rockNormalTexture);
+                rock.bumpStrength = 1.4;
 
-            rock.position = [x, y, z];
+                rock.position = [x, y, z];
 
-            let s = 0.6 + Math.random() * 0.4;
-            rock.size = [s, s, s];
+                let s = 0.6 + Math.random() * 0.4;
+                rock.size = [s, s, s];
 
-            return rock;
-        }
+                return rock;
+            }
             var rocks = [];
 
             for (let i = 0; i < 25; i++) {
@@ -603,7 +603,7 @@
                 rocks.push(createRock(xLeft, y, z));
             }
 
-            // Boats are made from the vertices and indices in ships.js.
+            // boats are made from the vertices and indices in ships.js
             const { Boat1, Boat2, Boat3, Boat4 } = createShipModels();
 
             function makeColorArray(vertexCount, color) {
@@ -614,7 +614,7 @@
                 return colors;
             }
 
-            function createClassicCannon() {
+            function createCannon() {
                 const baseVertices = [
                     -0.15, -0.08, 0.00,
                      0.15, -0.08, 0.00,
@@ -657,7 +657,7 @@
                     1.0, 0.0
                 ];
 
-                // Radially outward normals so the cannon catches light from all sides instead of just the top
+                // funky normals so that it catches light kinda like a barrel instead of of rectangle
                 const n = 0.577; // 1 / sqrt(3)
                 const cannonNormals = [
                     -n,-n,-n,  n,-n,-n,  n, n,-n, -n, n,-n,
@@ -669,7 +669,6 @@
                 const base = new ReflectiveShape(baseVertices, indices, baseTextureCoordinates, cannonNormals, baseColorTexture, baseNormalTexture);
                 base.bumpStrength = 0.8;
                 base.blendFactor = 0.0;
-                // Neutral ambient/diffuse so the wood texture color shines through brightly
                 base.AmbientMaterial = [1.0, 1.0, 1.0, 1.0];
                 base.DiffuseMaterial = [1.0, 1.0, 1.0, 1.0];
                 base.SpecularMaterial = [0.8, 0.8, 0.8, 1.0];
@@ -704,22 +703,22 @@
                 };
             }
 
-            const cannonSW = createClassicCannon();
+            const cannonSW = createCannon();
             cannonSW.position = [-0.75, -0.75, -0.05];
             cannonSW.rotation = [0.0, 0.0, Math.PI / 4];
             cannonSW.size = [1.0, 1.0, 1.0];
 
-            const cannonSE = createClassicCannon();
+            const cannonSE = createCannon();
             cannonSE.position = [0.75, -0.75, -0.05];
             cannonSE.rotation = [0.0, 0.0, 3 * Math.PI / 4];
             cannonSE.size = [1.0, 1.0, 1.0];
 
-            const cannonNW = createClassicCannon();
+            const cannonNW = createCannon();
             cannonNW.position = [-0.75, 0.75, -0.05];
             cannonNW.rotation = [0.0, 0.0, -Math.PI / 4];
             cannonNW.size = [1.0, 1.0, 1.0];
 
-            const cannonNE = createClassicCannon();
+            const cannonNE = createCannon();
             cannonNE.position = [0.75, 0.75, -0.05];
             cannonNE.rotation = [0.0, 0.0, -3 * Math.PI / 4];
             cannonNE.size = [1.0, 1.0, 1.0];
@@ -732,7 +731,7 @@
             Water.cubeMapTexture = myCubeMap;
 
             // Game state variables
-            // Phases: "setup_a", "setup_b", "transition", "attack", "game_over"
+            // phases are "setup_a", "setup_b", "transition", "attack", "game_over"
             let gamePhase = "setup_a";
             let currentSetupPlayer = "bottom"; // "top" or "bottom"
             let isPlayerBView = false;
@@ -755,14 +754,14 @@
             let selectedShip = null;
             let previewCells = [];
 
-            // Attack phase tracking
+            // attack phase tracking
             let currentAttacker = "A"; // "A" or "B"
             let playerAHits = new Set();  // keys of tiles A has hit on B's grid
             let playerAMisses = new Set();
             let playerBHits = new Set();  // keys of tiles B has hit on A's grid
             let playerBMisses = new Set();
             let winner = null;
-            let lastShotResult = null; // {type: "hit"|"miss"|"sunk", tile, ship?}
+            let lastShotResult = null; // type: "hit"|"miss"|"sunk", tile, ship?
 
             let hoveredTile = null;
 
@@ -797,9 +796,9 @@
                 const aspect = canvas.width / canvas.height;
                 const ray = rayFromMouse(mouseX, mouseY, aspect, Math.PI / 3, cameraPos, cameraTarget, cameraUp);
 
-                // --- SETUP PHASES ---
+                // setup
                 if (gamePhase === "setup_a" || gamePhase === "setup_b") {
-                    // side ships live on their own plane
+                    // side ships are on their own plane
                     const sideHit = intersectRayWithZPlane(ray.origin, ray.direction, 0.2);
                     if (sideHit) {
                         const picked = pickShipFromSide(sideHit[0], -sideHit[1]);
@@ -839,7 +838,7 @@
                     return;
                 }
 
-                // --- ATTACK PHASE ---
+                // attack phase
                 if (gamePhase === "attack") {
                     const gridHit = intersectRayWithZPlane(ray.origin, ray.direction, -0.10);
                     if (!gridHit) return;
@@ -847,7 +846,7 @@
                     let hoverX = gridHit[0];
                     let hoverY = -gridHit[1]; // flip for size[1] = -1
 
-                    // Attacker fires at the OPPONENT's grid
+                    // attacker fires at the opponent's grid
                     const targetGrid = currentAttacker === "A" ? gridTop : gridBottom;
                     const targetFleet = currentAttacker === "A" ? playerBFleet : playerAFleet;
                     const hitSet = currentAttacker === "A" ? playerAHits : playerBHits;
@@ -998,12 +997,12 @@
                 let html = "<b>Your Ships:</b><br>";
                 for (let ship of myFleet) {
                     const sunk = isShipSunk(ship, myHitsAgainst);
-                    html += (sunk ? "☠ " : "🚢 ") + SHIP_NAMES[ship.id] + " (" + ship.length + ")<br>";
+                    html += (sunk ? "X " : "  ") + SHIP_NAMES[ship.id] + " (" + ship.length + ")<br>";
                 }
                 html += "<br><b>Enemy Ships:</b><br>";
                 for (let ship of oppFleet) {
                     const sunk = isShipSunk(ship, oppHits);
-                    html += (sunk ? "☠ " : "? ") + SHIP_NAMES[ship.id] + " (" + ship.length + ")" + (sunk ? " SUNK" : "") + "<br>";
+                    html += (sunk ? "X " : "  ") + SHIP_NAMES[ship.id] + " (" + ship.length + ")" + (sunk ? " SUNK" : "") + "<br>";
                 }
                 shipStatusEl.innerHTML = html;
             }
@@ -1120,48 +1119,37 @@
                 if (!window.collider) window.collider = new CollisionDetection();
                 
                 const virtualFloorObj = [cameraPos[0], cameraPos[1], grassZ];
-                const cameraRadius = 0.2; // How close the camera can get to the floor
+                const cameraRadius = 0.2; //little buffer
 
                 // AABB check between camera and floor
                 if (window.collider.AABBCollider(cameraPos, virtualFloorObj, cameraRadius) || cameraPos[2] < grassZ) {
                     cameraPos[2] = grassZ + cameraRadius;
                 }
 
-                // Ceilings
+                // ceiling
                 const ceilObj = [cameraPos[0], cameraPos[1], 4.0];
                 if (window.collider.AABBCollider(cameraPos, ceilObj, cameraRadius) || cameraPos[2] > 4.0) {
                     cameraPos[2] = 4.0 - cameraRadius;
                 }
 
-                // Wall collisions - keep camera inside the grass boundaries
+                // wall collsion
                 const wallRadius = 0.2;
-
-                // Left Wall
                 const leftWall = [-1.0, cameraPos[1], cameraPos[2]];
                 if (window.collider.AABBCollider(cameraPos, leftWall, wallRadius) || cameraPos[0] < -4.0) {
                     cameraPos[0] = -1.0 + wallRadius;
                 }
-
-                // Right Wall
                 const rightWall = [1.0, cameraPos[1], cameraPos[2]];
                 if (window.collider.AABBCollider(cameraPos, rightWall, wallRadius) || cameraPos[0] > 4.0) {
                     cameraPos[0] = 1.0 - wallRadius;
                 }
-
-                // Bottom Wall (Y = -2.0)
                 const bottomWall = [cameraPos[0], -2.0, cameraPos[2]];
                 if (window.collider.AABBCollider(cameraPos, bottomWall, wallRadius) || cameraPos[1] < -2.0) {
                     cameraPos[1] = -2.0 + wallRadius;
                 }
-
-                // Top Wall (Y = 2.0)
                 const topWall = [cameraPos[0], 2.0, cameraPos[2]];
                 if (window.collider.AABBCollider(cameraPos, topWall, wallRadius) || cameraPos[1] > 2.0) {
                     cameraPos[1] = 2.0 - wallRadius;
                 }
-
-
-                // restore the same camera tilt/look
                 cameraTarget = [
                     cameraPos[0] + lookOffset[0],
                     cameraPos[1] + lookOffset[1],
@@ -1169,175 +1157,7 @@
                 ];
             }
 
-            // Make ships - positioned in front of each player's grid
-            function makeFleetForCurrentPlayer() {
-                return SHIP_LENGTHS.map((len, i) => ({
-                    id: i,
-                    length: len,
-                    horizontal: true,
-                    placed: false,
-                    cells: [],
-                    sideX: 0,
-                    sideY: currentSetupPlayer === "bottom"
-                        ? -1.05 - i * 0.09
-                        :  1.05 + i * 0.09
-                }));
-            }
-
-            // Check if a point is inside a rectangle (used for picking ships on the side)
-            function pickShipFromSide(worldX, worldY) {
-                for (let ship of availableShips) {
-                    if (ship.placed) continue;
-
-                    const width = ship.horizontal ? ship.length * 0.05 : 0.05;
-                    const height = ship.horizontal ? 0.05 : ship.length * 0.05;
-
-                    if (pointInRect(worldX, worldY, ship.sideX, ship.sideY, width, height)) {
-                        return ship;
-                    }
-                }
-                return null;
-            }
-
-            // Shows preview of where your ship will be on the grid
-            function updateShipPreview() {
-                previewCells = [];
-
-                if (!selectedShip) return;
-                if (!hoveredTile) return;
-
-                const activeGrid = currentSetupPlayer === "bottom" ? gridBottom : gridTop;
-                const activeFleet = currentSetupPlayer === "bottom" ? playerAFleet : playerBFleet;
-
-                const cells = getPlacementCells(
-                    hoveredTile,
-                    selectedShip.length,
-                    selectedShip.horizontal,
-                    activeGrid
-                );
-
-                if (!cells) return;
-                if (cellsOverlapPlacedShip(cells, activeFleet)) return;
-
-                previewCells = cells;
-            }
-
-            function getShipModelBounds(model) {
-                if (shipModelBounds.has(model)) return shipModelBounds.get(model);
-
-                const bounds = {
-                    minX: Infinity,
-                    maxX: -Infinity,
-                    minY: Infinity,
-                    maxY: -Infinity,
-                    minZ: Infinity,
-                    maxZ: -Infinity
-                };
-
-                for (let i = 0; i < model.vertices.length; i += 3) {
-                    const x = model.vertices[i];
-                    const y = model.vertices[i + 1];
-                    const z = model.vertices[i + 2];
-
-                    bounds.minX = Math.min(bounds.minX, x);
-                    bounds.maxX = Math.max(bounds.maxX, x);
-                    bounds.minY = Math.min(bounds.minY, y);
-                    bounds.maxY = Math.max(bounds.maxY, y);
-                    bounds.minZ = Math.min(bounds.minZ, z);
-                    bounds.maxZ = Math.max(bounds.maxZ, z);
-                }
-
-                bounds.width = bounds.maxX - bounds.minX;
-                bounds.length = bounds.maxY - bounds.minY;
-                bounds.height = bounds.maxZ - bounds.minZ;
-                shipModelBounds.set(model, bounds);
-                return bounds;
-            }
-
-            function getCellsCenter(cells) {
-                let x = 0;
-                let y = 0;
-
-                for (let cell of cells) {
-                    x += cell.center[0];
-                    y += cell.center[1];
-                }
-
-                return [x / cells.length, y / cells.length];
-            }
-
-            function renderBoatForShip(ship, center, options = {}) {
-                const model = SHIP_MODEL_BY_LENGTH[ship.length];
-                if (!model) return;
-
-                const bounds = getShipModelBounds(model);
-                const tileSize = 0.05;
-                const selectedScale = options.selected ? 1.12 : 1.0;
-                const targetLength = ship.length * tileSize * 0.92 * selectedScale;
-                const targetWidth = tileSize * 0.82 * selectedScale;
-                const scaleX = targetWidth / bounds.width;
-                const scaleY = targetLength / bounds.length;
-                const scaleZ = Math.min(scaleX, scaleY) * (options.side ? 1.35 : 1.05);
-                model.position = [center[0], -center[1], options.side ? 0.2 : -0.095];
-                model.size = [scaleX, scaleY, scaleZ];
-                model.rotation = [0.0, 0.0, ship.horizontal ? Math.PI / 2 : 0.0];
-                if (options.black) {
-                    model.setSolidColor([0.0, 0.0, 0.0]);
-                } else {
-                    model.setColors(model.baseColors);
-                }
-                model.render();
-            }
-
-            function renderSideShips() {
-                for (let ship of availableShips) {
-                    if (ship.placed) continue;
-
-                    renderBoatForShip(
-                        ship,
-                        [ship.sideX, ship.sideY],
-                        { side: true, selected: selectedShip && selectedShip.id === ship.id }
-                    );
-                }
-            }
-
-            function renderSetupPreviewShip() {
-                if (!selectedShip) return;
-                if (previewCells.length !== selectedShip.length) return;
-
-                renderBoatForShip(selectedShip, getCellsCenter(previewCells));
-            }
-
-            function renderPlacedShipModels() {
-                if (gamePhase === "setup_a" || gamePhase === "setup_b") {
-                    const visibleFleet = currentSetupPlayer === "bottom" ? playerAFleet : playerBFleet;
-
-                    for (let ship of visibleFleet) {
-                        if (!ship.placed || ship.cells.length !== ship.length) continue;
-                        renderBoatForShip(ship, getCellsCenter(ship.cells));
-                    }
-                    return;
-                }
-
-                if (gamePhase === "attack" || gamePhase === "game_over") {
-                    const myFleet = currentAttacker === "A" ? playerAFleet : playerBFleet;
-                    const opponentFleet = currentAttacker === "A" ? playerBFleet : playerAFleet;
-                    const hitsAgainstMe = currentAttacker === "A" ? playerBHits : playerAHits;
-                    const myHits = currentAttacker === "A" ? playerAHits : playerBHits;
-
-                    for (let ship of myFleet) {
-                        if (!ship.placed || ship.cells.length !== ship.length) continue;
-                        renderBoatForShip(ship, getCellsCenter(ship.cells), { black: isShipSunk(ship, hitsAgainstMe) });
-                    }
-
-                    for (let ship of opponentFleet) {
-                        if (!ship.placed || ship.cells.length !== ship.length) continue;
-                        if (!isShipSunk(ship, myHits)) continue;
-                        renderBoatForShip(ship, getCellsCenter(ship.cells));
-                    }
-                }
-            }
-
+            
             function animate(){
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -1380,14 +1200,13 @@
                 Water.size[1] = flipY;
                 divider.size[1] = flipY;
 
-                // Render Scene - set material color before each group
+                // Render Scene - set material
                 setMaterialColor(1.0, 1.0, 1.0); // green grass
                 grassLeft.render();
                 grassRight.render();
                 grassTop.render();
                 grassBottom.render();
 
-                setMaterialColor(1.0,1.0,1.0); // sand
                 sandLeft.render();
                 sandRight.render();
                 sandTop.render();
@@ -1395,7 +1214,6 @@
 
                 Water.render();
 
-                setMaterialColor(1.0, 1.0, 1.0); // neutral for textured cannons
                 cannonSW.render();
                 cannonSE.render();
                 cannonNW.render();
@@ -1411,17 +1229,15 @@
                 }
 
                 // Light marker cube
-                setMaterialColor(1.0, 1.0, 1.0);
                 lightMarker.size[1] = flipY;
                 lightMarker.render();
 
-                // --- Tile coloring logic ---
-                // Reset all tiles to default blue
+                // tile coloring
                 gridTop.forEach(tile => { tile.color = [0.10, 0.50, 0.90]; });
                 gridBottom.forEach(tile => { tile.color = [0.10, 0.50, 0.90]; });
 
                 if (gamePhase === "setup_a" || gamePhase === "setup_b") {
-                    // Show placed ships for CURRENT player only
+                    // Show placed ships for current player only
                     const setupFleet = gamePhase === "setup_a" ? playerAFleet : playerBFleet;
                     for (let ship of setupFleet) {
                         for (let cell of ship.cells) {
@@ -1429,7 +1245,6 @@
                         }
                     }
                 } else if (gamePhase === "attack" || gamePhase === "transition" || gamePhase === "game_over") {
-                    // Current player sees their OWN ships as gray
                     const myFleet = currentAttacker === "A" ? playerAFleet : playerBFleet;
                     const myGrid = currentAttacker === "A" ? gridBottom : gridTop;
                     const theirHits = currentAttacker === "A" ? playerBHits : playerAHits;
@@ -1442,17 +1257,17 @@
                         }
                     }
 
-                    // Show hits/misses on the opponent's grid
+                    // show hits/misses on the opponent's grid
                     const oppGrid = currentAttacker === "A" ? gridTop : gridBottom;
                     const oppFleet = currentAttacker === "A" ? playerBFleet : playerAFleet;
                     const myHits = currentAttacker === "A" ? playerAHits : playerBHits;
                     const myMisses = currentAttacker === "A" ? playerAMisses : playerBMisses;
 
-                    // Show hits as red, sunk as dark red
+                    // show hits as red, sunk as dark red
                     for (let tile of oppGrid) {
                         const key = getTileKey(tile);
                         if (myHits.has(key)) {
-                            // Check if the ship this tile belongs to is fully sunk
+                            // check if the ship this tile belongs to is fully sunk
                             const ship = checkHit(tile, oppFleet);
                             if (ship && isShipSunk(ship, myHits)) {
                                 tile.color = [0.6, 0.0, 0.0]; // dark red = sunk
@@ -1465,7 +1280,7 @@
                         // opponent ships stay hidden (blue) if not hit
                     }
 
-                    // Also show hits the OPPONENT made on YOUR grid
+                    // Also show hits the opponent made on your grid
                     for (let tile of myGrid) {
                         const key = getTileKey(tile);
                         if (theirHits.has(key)) {
@@ -1479,7 +1294,7 @@
                     }
                 }
 
-                // Hover detection
+                // hover detection
                 const ray = rayFromMouse(mouseX, mouseY, aspect, Math.PI / 3, cameraPos, cameraTarget, cameraUp);
                 const hitPoint = intersectRayWithZPlane(ray.origin, ray.direction, -0.10);
 
@@ -1506,7 +1321,7 @@
                             const hitSet = currentAttacker === "A" ? playerAHits : playerBHits;
                             const missSet = currentAttacker === "A" ? playerAMisses : playerBMisses;
                             if (hitSet.has(key) || missSet.has(key)) {
-                                hoveredTile = null; // don't highlight already-shot tiles
+                                hoveredTile = null; // don't highlight already shot tiles
                             }
                         }
                     }
@@ -1516,12 +1331,12 @@
                     hoveredTile.color = [1.0, 1.0, 0.6]; // yellow hover
                 }
 
-                // Ship preview and side ships (setup only)
+                // ship preview and side ships (setup only)
                 if (gamePhase === "setup_a" || gamePhase === "setup_b") {
                     updateShipPreview();
                 }
 
-                // Apply preview cell coloring
+                // apply preview cell coloring
                 for (let cell of previewCells) {
                     cell.color = [0.8, 0.8, 0.8];
                 }

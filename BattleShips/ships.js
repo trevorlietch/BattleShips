@@ -2884,3 +2884,172 @@ function createBoat4Colors(vertices) {
         return [0.88, 0.89, 0.93];
     });
 }
+
+// make ship
+function makeFleetForCurrentPlayer() {
+    return SHIP_LENGTHS.map((len, i) => ({
+        id: i,
+        length: len,
+        horizontal: true,
+        placed: false,
+        cells: [],
+        sideX: 0,
+        sideY: currentSetupPlayer === "bottom"
+            ? -1.05 - i * 0.09
+            :  1.05 + i * 0.09
+    }));
+}
+
+// Check if a point is inside a rectangle (used for picking ships on the side)
+function pickShipFromSide(worldX, worldY) {
+    for (let ship of availableShips) {
+        if (ship.placed) continue;
+
+        const width = ship.horizontal ? ship.length * 0.05 : 0.05;
+        const height = ship.horizontal ? 0.05 : ship.length * 0.05;
+
+        if (pointInRect(worldX, worldY, ship.sideX, ship.sideY, width, height)) {
+            return ship;
+        }
+    }
+    return null;
+}
+
+// shows where the ship will be on the grid
+function updateShipPreview() {
+    previewCells = [];
+
+    if (!selectedShip) return;
+    if (!hoveredTile) return;
+
+    const activeGrid = currentSetupPlayer === "bottom" ? gridBottom : gridTop;
+    const activeFleet = currentSetupPlayer === "bottom" ? playerAFleet : playerBFleet;
+
+    const cells = getPlacementCells(
+        hoveredTile,
+        selectedShip.length,
+        selectedShip.horizontal,
+        activeGrid
+    );
+
+    if (!cells) return;
+    if (cellsOverlapPlacedShip(cells, activeFleet)) return;
+
+    previewCells = cells;
+}
+
+function getShipModelBounds(model) {
+    if (shipModelBounds.has(model)) return shipModelBounds.get(model);
+
+    const bounds = {
+        minX: Infinity,
+        maxX: -Infinity,
+        minY: Infinity,
+        maxY: -Infinity,
+        minZ: Infinity,
+        maxZ: -Infinity
+    };
+
+    for (let i = 0; i < model.vertices.length; i += 3) {
+        const x = model.vertices[i];
+        const y = model.vertices[i + 1];
+        const z = model.vertices[i + 2];
+
+        bounds.minX = Math.min(bounds.minX, x);
+        bounds.maxX = Math.max(bounds.maxX, x);
+        bounds.minY = Math.min(bounds.minY, y);
+        bounds.maxY = Math.max(bounds.maxY, y);
+        bounds.minZ = Math.min(bounds.minZ, z);
+        bounds.maxZ = Math.max(bounds.maxZ, z);
+    }
+
+    bounds.width = bounds.maxX - bounds.minX;
+    bounds.length = bounds.maxY - bounds.minY;
+    bounds.height = bounds.maxZ - bounds.minZ;
+    shipModelBounds.set(model, bounds);
+    return bounds;
+}
+
+function getCellsCenter(cells) {
+    let x = 0;
+    let y = 0;
+
+    for (let cell of cells) {
+        x += cell.center[0];
+        y += cell.center[1];
+    }
+
+    return [x / cells.length, y / cells.length];
+}
+
+function renderBoatForShip(ship, center, options = {}) {
+    const model = SHIP_MODEL_BY_LENGTH[ship.length];
+    if (!model) return;
+
+    const bounds = getShipModelBounds(model);
+    const tileSize = 0.05;
+    const selectedScale = options.selected ? 1.12 : 1.0;
+    const targetLength = ship.length * tileSize * 0.92 * selectedScale;
+    const targetWidth = tileSize * 0.82 * selectedScale;
+    const scaleX = targetWidth / bounds.width;
+    const scaleY = targetLength / bounds.length;
+    const scaleZ = Math.min(scaleX, scaleY) * (options.side ? 1.35 : 1.05);
+    model.position = [center[0], -center[1], options.side ? 0.2 : -0.095];
+    model.size = [scaleX, scaleY, scaleZ];
+    model.rotation = [0.0, 0.0, ship.horizontal ? Math.PI / 2 : 0.0];
+    if (options.black) {
+        model.setSolidColor([0.0, 0.0, 0.0]);
+    } else {
+        model.setColors(model.baseColors);
+    }
+    model.render();
+}
+
+function renderSideShips() {
+    for (let ship of availableShips) {
+        if (ship.placed) continue;
+
+        renderBoatForShip(
+            ship,
+            [ship.sideX, ship.sideY],
+            { side: true, selected: selectedShip && selectedShip.id === ship.id }
+        );
+    }
+}
+
+function renderSetupPreviewShip() {
+    if (!selectedShip) return;
+    if (previewCells.length !== selectedShip.length) return;
+
+    renderBoatForShip(selectedShip, getCellsCenter(previewCells));
+}
+
+function renderPlacedShipModels() {
+    if (gamePhase === "setup_a" || gamePhase === "setup_b") {
+        const visibleFleet = currentSetupPlayer === "bottom" ? playerAFleet : playerBFleet;
+
+        for (let ship of visibleFleet) {
+            if (!ship.placed || ship.cells.length !== ship.length) continue;
+            renderBoatForShip(ship, getCellsCenter(ship.cells));
+        }
+        return;
+    }
+
+    if (gamePhase === "attack" || gamePhase === "game_over") {
+        const myFleet = currentAttacker === "A" ? playerAFleet : playerBFleet;
+        const opponentFleet = currentAttacker === "A" ? playerBFleet : playerAFleet;
+        const hitsAgainstMe = currentAttacker === "A" ? playerBHits : playerAHits;
+        const myHits = currentAttacker === "A" ? playerAHits : playerBHits;
+
+        for (let ship of myFleet) {
+            if (!ship.placed || ship.cells.length !== ship.length) continue;
+            renderBoatForShip(ship, getCellsCenter(ship.cells), { black: isShipSunk(ship, hitsAgainstMe) });
+        }
+
+        for (let ship of opponentFleet) {
+            if (!ship.placed || ship.cells.length !== ship.length) continue;
+            if (!isShipSunk(ship, myHits)) continue;
+            renderBoatForShip(ship, getCellsCenter(ship.cells));
+        }
+    }
+}
