@@ -393,8 +393,8 @@
                 CreateImageTexture("textures/water 0342.png", gl.REPEAT, gl.LINEAR, gl.LINEAR),
                 CreateImageTexture("textures/water 0342normal.jpg", gl.REPEAT, gl.LINEAR, gl.LINEAR)
             );
-            Water.bumpStrength = 1.0;
-            Water.blendFactor = 0.0; // 0.0 so it doesn't render pitch-black without a cubemap
+            Water.bumpStrength = 0.3;
+            Water.blendFactor = 0.2;
             Water.AmbientMaterial = [0.0, 0.25, 0.55, 1.0];
             Water.DiffuseMaterial = [0.0, 0.3, 0.6, 1.0];
             Water.SpecularMaterial = [1.0, 1.0, 1.0, 1.0];
@@ -535,52 +535,72 @@
             var gridBottom = createTileGrid(0.0, -0.30, 0.05, 0.0, 9);
 
             function createRock(x, y, z) {
-            const skew = (Math.random() - 0.5) * 0.25;
-            const height = 0.5 + Math.random() * 0.4;
-            const base = 0.15 + Math.random() * 0.15;
+                
+                const height = 0.25 + Math.random() * 0.2;
+                const base = 0.25 + Math.random() * 0.15;
+                const top_base = base * (0.4 + Math.random() * 0.4); 
 
-            const top = [skew, height, 0.0];
-            const p1 = [-base, 0.0, -base];
-            const p2 = [ base, 0.0, -base];
-            const p3 = [ base, 0.0,  base];
-            const p4 = [-base, 0.0,  base];
+                // Randomize each corner's base coordinates to break the square shape
+                const p1 = [-base + (Math.random()-0.5)*0.1, -base + (Math.random()-0.5)*0.1, 0.0];
+                const p2 = [ base + (Math.random()-0.5)*0.1, -base + (Math.random()-0.5)*0.1, 0.0];
+                const p3 = [ base + (Math.random()-0.5)*0.1,  base + (Math.random()-0.5)*0.1, 0.0];
+                const p4 = [-base + (Math.random()-0.5)*0.1,  base + (Math.random()-0.5)*0.1, 0.0];
 
-            const vertices = [
-                ...top, ...p1, ...p2,
-                ...top, ...p2, ...p3,
-                ...top, ...p3, ...p4,
-                ...top, ...p4, ...p1
-            ];
+                // Randomize each top corner's height and X/Y position so it looks kinda uneven
+                const t1 = [-top_base + (Math.random()-0.5)*0.1, -top_base + (Math.random()-0.5)*0.1, height + (Math.random()-0.5)*0.2];
+                const t2 = [ top_base + (Math.random()-0.5)*0.1, -top_base + (Math.random()-0.5)*0.1, height + (Math.random()-0.5)*0.2];
+                const t3 = [ top_base + (Math.random()-0.5)*0.1,  top_base + (Math.random()-0.5)*0.1, height + (Math.random()-0.5)*0.2];
+                const t4 = [-top_base + (Math.random()-0.5)*0.1,  top_base + (Math.random()-0.5)*0.1, height + (Math.random()-0.5)*0.2];
 
-            const texCoords = [
-                0.5, 1.0,  0.0, 0.0,  1.0, 0.0,
-                0.5, 1.0,  0.0, 0.0,  1.0, 0.0,
-                0.5, 1.0,  0.0, 0.0,  1.0, 0.0,
-                0.5, 1.0,  0.0, 0.0,  1.0, 0.0
-            ];
+                const vertices = [
+                    // Front
+                    ...p1, ...p2, ...t2,
+                    ...p1, ...t2, ...t1,
+                    // Right
+                    ...p2, ...p3, ...t3,
+                    ...p2, ...t3, ...t2,
+                    // Back
+                    ...p3, ...p4, ...t4,
+                    ...p3, ...t4, ...t3,
+                    // Left
+                    ...p4, ...p1, ...t1,
+                    ...p4, ...t1, ...t4,
+                    // Top
+                    ...t4, ...t1, ...t2,
+                    ...t4, ...t2, ...t3
+                ];
 
-            const indices = [...Array(12).keys()];
+                const texQuad = [
+                    0.0, 1.0,  1.0, 1.0,  1.0, 0.0,
+                    0.0, 1.0,  1.0, 0.0,  0.0, 0.0
+                ];
+                const texCoords = [
+                    ...texQuad, ...texQuad, ...texQuad, ...texQuad, ...texQuad
+                ];
+
+                const indices = [...Array(30).keys()];
             const rock = new Shape(vertices, indices, texCoords, rockColorTexture, rockNormalTexture);
             rock.bumpStrength = 1.4;
 
             rock.position = [x, y, z];
 
-            let s = 1.5 + Math.random() * 0.1;
+            let s = 0.6 + Math.random() * 0.4;
             rock.size = [s, s, s];
 
             return rock;
         }
             var rocks = [];
 
-            for (let i = 0; i < 10; i++) {
-                let y = -2.2 + (i * 0.4) + (Math.random() * 0.1); 
-                let z = 0.4;                        
+            for (let i = 0; i < 25; i++) {
+                let y = -2.2 + (i * 0.15) + ((Math.random() - 0.5) * 0.1); 
+                let z = grassZ;                  
 
-                let xRight = 1.3;                           
+
+                let xRight = 1.3 + ((Math.random() - 0.5) * 0.1);                           
                 rocks.push(createRock(xRight, y, z));
 
-            let xLeft = -1.3; 
-            rocks.push(createRock(xLeft, y, z));
+                let xLeft = -1.3 + ((Math.random() - 0.5) * 0.1); 
+                rocks.push(createRock(xLeft, y, z));
             }
 
             // Boats are made from the vertices and indices in ships.js.
@@ -637,14 +657,33 @@
                     1.0, 0.0
                 ];
 
+                // Radially outward normals so the cannon catches light from all sides instead of just the top
+                const n = 0.577; // 1 / sqrt(3)
+                const cannonNormals = [
+                    -n,-n,-n,  n,-n,-n,  n, n,-n, -n, n,-n,
+                    -n,-n, n,  n,-n, n,  n, n, n, -n, n, n
+                ];
+
                 const baseColorTexture = CreateImageTexture("textures/wood_shutter_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
                 const baseNormalTexture = CreateImageTexture("textures/wood_shutter_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
-                const base = new Shape(baseVertices, indices, baseTextureCoordinates, baseColorTexture, baseNormalTexture);
+                const base = new ReflectiveShape(baseVertices, indices, baseTextureCoordinates, cannonNormals, baseColorTexture, baseNormalTexture);
                 base.bumpStrength = 0.8;
+                base.blendFactor = 0.0;
+                // Neutral ambient/diffuse so the wood texture color shines through brightly
+                base.AmbientMaterial = [1.0, 1.0, 1.0, 1.0];
+                base.DiffuseMaterial = [1.0, 1.0, 1.0, 1.0];
+                base.SpecularMaterial = [0.8, 0.8, 0.8, 1.0];
+                base.Shininess = 64.0;
+
                 const barrelColorTexture = CreateImageTexture("textures/rusty_metal_sheet_diff_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
                 const barrelNormalTexture = CreateImageTexture("textures/rusty_metal_sheet_nor_gl_4k.png", gl.REPEAT, gl.LINEAR, gl.LINEAR);
-                const barrel = new Shape(barrelVertices, indices, null, barrelColorTexture, barrelNormalTexture);
+                const barrel = new ReflectiveShape(barrelVertices, indices, baseTextureCoordinates, cannonNormals, barrelColorTexture, barrelNormalTexture);
                 barrel.bumpStrength = 1.0;
+                barrel.blendFactor = 0.0;
+                barrel.AmbientMaterial = [1.0, 1.0, 1.0, 1.0];
+                barrel.DiffuseMaterial = [1.0, 1.0, 1.0, 1.0];
+                barrel.SpecularMaterial = [1.0, 1.0, 1.0, 1.0];
+                barrel.Shininess = 128.0;
 
                 return {
                     base,
@@ -684,6 +723,13 @@
             cannonNE.position = [0.75, 0.75, -0.05];
             cannonNE.rotation = [0.0, 0.0, -3 * Math.PI / 4];
             cannonNE.size = [1.0, 1.0, 1.0];
+
+            // Skybox initialization
+            var myCubeMap = CreateCubeMap(cubeMapFaceSources);
+            var mySkybox = new Skybox(cubeVertices, cubeIndices, cubeTextureCoordinates, myCubeMap);
+            
+            // let it reflect skybox
+            Water.cubeMapTexture = myCubeMap;
 
             // Game state variables
             // Phases: "setup_a", "setup_b", "transition", "attack", "game_over"
@@ -1309,6 +1355,9 @@
                 for (var i = 0; i < Lights.length; i++) {
                     Lights[i].render(i, Lights.length);
                 }
+
+                // Render skybox behind everything else
+                mySkybox.render({ position: cameraPos });
 
                 const flipY = -1;
 

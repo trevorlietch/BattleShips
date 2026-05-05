@@ -69,12 +69,12 @@
             //More Cube Maps: https://www.humus.name/index.php?page=Textures&start=0
             //https://opengameart.org/content/cloudy-skyboxes-0
             var cubeMapFaceSources = {
-                posx: "CubeMap/posx.jpg",
-                negx: "CubeMap/negx.jpg",
-                posy: "CubeMap/posy.jpg",
-                negy: "CubeMap/negy.jpg",
-                posz: "CubeMap/posz.jpg",
-                negz: "CubeMap/negz.jpg"
+                posx: "CubeMap/px.png",
+                negx: "CubeMap/nx.png",
+                posy: "CubeMap/py.png",
+                negy: "CubeMap/ny.png",
+                posz: "CubeMap/pz.png",
+                negz: "CubeMap/nz.png"
             };
 
             // Octagon as indexed geometry (center + 8 outer points)
